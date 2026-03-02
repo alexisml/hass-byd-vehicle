@@ -302,9 +302,7 @@ async def test_gps_fetch_auth_error_reraises() -> None:
     coordinator.hass = MagicMock()
 
     mock_client = MagicMock()
-    mock_client.get_gps_info = AsyncMock(
-        side_effect=BydAuthenticationError("auth")
-    )
+    mock_client.get_gps_info = AsyncMock(side_effect=BydAuthenticationError("auth"))
 
     async def invoke_handler(func, **kwargs):
         return await func(mock_client)

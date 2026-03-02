@@ -256,9 +256,7 @@ async def test_telemetry_fetch_hvac_auth_error_reraises() -> None:
     mock_realtime.is_vehicle_on = True
     mock_client = MagicMock()
     mock_client.get_vehicle_realtime = AsyncMock(return_value=mock_realtime)
-    mock_client.get_hvac_status = AsyncMock(
-        side_effect=BydAuthenticationError("auth")
-    )
+    mock_client.get_hvac_status = AsyncMock(side_effect=BydAuthenticationError("auth"))
 
     async def invoke_handler(func, **kwargs):
         return await func(mock_client)

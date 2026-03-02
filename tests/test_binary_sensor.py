@@ -332,5 +332,7 @@ def test_binary_sensor_init_stays_enabled_when_value_present() -> None:
         sensor = BydBinarySensor(coordinator, vin, vehicle, desc)
 
     # Should NOT have been auto-disabled
-    assert not hasattr(sensor, "_attr_entity_registry_enabled_default") or \
-        sensor._attr_entity_registry_enabled_default is not False
+    assert (
+        not hasattr(sensor, "_attr_entity_registry_enabled_default")
+        or sensor._attr_entity_registry_enabled_default is not False
+    )
