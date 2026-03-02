@@ -182,3 +182,25 @@ async def test_async_setup_entry_creates_tracker_entity() -> None:
     entities = async_add_entities.call_args[0][0]
     assert len(entities) == 1
     assert isinstance(entities[0], BydDeviceTracker)
+
+
+def test_byd_device_tracker_init() -> None:
+    """Cover device_tracker.py lines 46-49: BydDeviceTracker.__init__."""
+    from unittest.mock import MagicMock, patch
+
+    vin = "TESTVIN123"
+    vehicle_mock = MagicMock()
+    coordinator = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.data = {"vehicles": {vin: vehicle_mock}}
+
+    # Patch CoordinatorEntity.__init__ to avoid HA event-loop requirement
+    with patch(
+        "homeassistant.helpers.update_coordinator.CoordinatorEntity.__init__",
+        return_value=None,
+    ):
+        tracker = BydDeviceTracker(coordinator, vin, vehicle_mock)
+
+    assert tracker._vin == vin
+    assert tracker._vehicle is vehicle_mock
+    assert tracker._attr_unique_id == f"{vin}_tracker"

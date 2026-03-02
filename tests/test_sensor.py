@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import types
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.byd_vehicle.sensor import (
@@ -315,3 +316,71 @@ def test_normalize_epoch_overflow_returns_none() -> None:
     # A huge integer will cause OverflowError in datetime.fromtimestamp
     result = _normalize_epoch(2**63)
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# async_setup_entry (lines 530-549)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_sensor_async_setup_entry_no_vehicles() -> None:
+    """Cover lines 530-549: async_setup_entry skips when vehicle is None."""
+    from custom_components.byd_vehicle.const import DOMAIN
+    from custom_components.byd_vehicle.sensor import async_setup_entry
+
+    vin = "TESTVIN123"
+    coordinator = MagicMock()
+    coordinator.data = {"vehicles": {}}  # vehicle is None → skip
+
+    hass = MagicMock()
+    hass.data = {
+        DOMAIN: {
+            "entry1": {
+                "coordinators": {vin: coordinator},
+                "gps_coordinators": {},
+            }
+        }
+    }
+    entry = MagicMock()
+    entry.entry_id = "entry1"
+    async_add_entities = MagicMock()
+
+    await async_setup_entry(hass, entry, async_add_entities)
+    async_add_entities.assert_called_once_with([])
+
+
+@pytest.mark.asyncio
+async def test_sensor_async_setup_entry_creates_entities() -> None:
+    """Cover lines 530-549 + 580-594: entities created when vehicle found."""
+    from custom_components.byd_vehicle.const import DOMAIN
+    from custom_components.byd_vehicle.sensor import SENSOR_DESCRIPTIONS, async_setup_entry
+
+    vin = "TESTVIN123"
+    vehicle_mock = MagicMock()
+    coordinator = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.data = {"vehicles": {vin: vehicle_mock}}
+
+    hass = MagicMock()
+    hass.data = {
+        DOMAIN: {
+            "entry1": {
+                "coordinators": {vin: coordinator},
+                "gps_coordinators": {},
+            }
+        }
+    }
+    entry = MagicMock()
+    entry.entry_id = "entry1"
+    async_add_entities = MagicMock()
+
+    with patch.object(BydSensor, "__init__", return_value=None):
+        await async_setup_entry(hass, entry, async_add_entities)
+
+    async_add_entities.assert_called_once()
+    entities = async_add_entities.call_args[0][0]
+    # All non-gps_last_updated sensors (gps_last_updated skipped when no gps_coordinator)
+    gps_count = sum(1 for d in SENSOR_DESCRIPTIONS if d.key == "gps_last_updated")
+    expected_count = len(SENSOR_DESCRIPTIONS) - gps_count
+    assert len(entities) == expected_count

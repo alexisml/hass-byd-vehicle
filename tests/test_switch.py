@@ -549,3 +549,174 @@ async def test_disable_polling_turn_off_enables() -> None:
     await entity.async_turn_off()
     assert entity._disabled is False
     coordinator.set_polling_enabled.assert_called_once_with(True)
+
+
+# ---------------------------------------------------------------------------
+# async_setup_entry (lines 31-49)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_switch_async_setup_entry_no_vehicles() -> None:
+    """Cover lines 31-49: async_setup_entry skips when vehicle is None."""
+    from custom_components.byd_vehicle.const import DOMAIN
+    from custom_components.byd_vehicle.switch import async_setup_entry
+
+    vin = "TESTVIN123"
+    coordinator = MagicMock()
+    coordinator.data = {"vehicles": {}}  # vehicle is None → skip
+
+    hass = MagicMock()
+    hass.data = {
+        DOMAIN: {
+            "entry1": {
+                "coordinators": {vin: coordinator},
+                "gps_coordinators": {},
+                "api": MagicMock(),
+            }
+        }
+    }
+    entry = MagicMock()
+    entry.entry_id = "entry1"
+    async_add_entities = MagicMock()
+
+    await async_setup_entry(hass, entry, async_add_entities)
+    async_add_entities.assert_called_once_with([])
+
+
+@pytest.mark.asyncio
+async def test_switch_async_setup_entry_creates_entities() -> None:
+    """Cover lines 31-49 + __init__ lines: entities created when vehicle found."""
+    from custom_components.byd_vehicle.const import DOMAIN
+    from custom_components.byd_vehicle.switch import (
+        BydBatteryHeatSwitch,
+        BydCarOnSwitch,
+        BydDisablePollingSwitch,
+        BydSteeringWheelHeatSwitch,
+        async_setup_entry,
+    )
+
+    vin = "TESTVIN123"
+    vehicle_mock = MagicMock()
+    coordinator = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.data = {"vehicles": {vin: vehicle_mock}}
+
+    hass = MagicMock()
+    hass.data = {
+        DOMAIN: {
+            "entry1": {
+                "coordinators": {vin: coordinator},
+                "gps_coordinators": {},
+                "api": MagicMock(),
+            }
+        }
+    }
+    entry = MagicMock()
+    entry.entry_id = "entry1"
+    async_add_entities = MagicMock()
+
+    with patch.object(BydBatteryHeatSwitch, "__init__", return_value=None), patch.object(
+        BydCarOnSwitch, "__init__", return_value=None
+    ), patch.object(
+        BydSteeringWheelHeatSwitch, "__init__", return_value=None
+    ), patch.object(
+        BydDisablePollingSwitch, "__init__", return_value=None
+    ):
+        await async_setup_entry(hass, entry, async_add_entities)
+
+    async_add_entities.assert_called_once()
+    entities = async_add_entities.call_args[0][0]
+    assert len(entities) == 4  # 1 disable-polling + 3 control switches
+
+
+# ---------------------------------------------------------------------------
+# Inner _call closures and _schedule_delayed_refresh
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_battery_heat_turn_on_executes_api_call() -> None:
+    """Cover switch.py line 110: inner _call closure in async_turn_on."""
+    entity = _make_battery_heat_switch()
+    client = AsyncMock()
+    client.set_battery_heat = AsyncMock(return_value=None)
+
+    async def execute_call(func, **kwargs):  # **kwargs absorbs vin= and command=
+        return await func(client)
+
+    entity._api.async_call = AsyncMock(side_effect=execute_call)
+    await entity.async_turn_on()
+    client.set_battery_heat.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_battery_heat_turn_off_executes_api_call() -> None:
+    """Cover switch.py line 126: inner _call closure in async_turn_off."""
+    entity = _make_battery_heat_switch()
+    client = AsyncMock()
+    client.set_battery_heat = AsyncMock(return_value=None)
+
+    async def execute_call(func, **kwargs):
+        return await func(client)
+
+    entity._api.async_call = AsyncMock(side_effect=execute_call)
+    await entity.async_turn_off()
+    client.set_battery_heat.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_car_on_turn_on_executes_api_call() -> None:
+    """Cover switch.py line 190: inner _call closure in BydCarOnSwitch.async_turn_on."""
+    entity = _make_car_on_switch()
+    entity.coordinator.apply_optimistic_hvac = MagicMock()
+    entity._schedule_delayed_refresh = MagicMock()
+    client = AsyncMock()
+    client.start_climate = AsyncMock(return_value=None)
+
+    async def execute_call(func, **kwargs):
+        return await func(client)
+
+    entity._api.async_call = AsyncMock(side_effect=execute_call)
+    await entity.async_turn_on()
+    client.start_climate.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_car_on_turn_off_executes_api_call() -> None:
+    """Cover switch.py line 217: inner _call closure in BydCarOnSwitch.async_turn_off."""
+    entity = _make_car_on_switch()
+    entity.coordinator.apply_optimistic_hvac = MagicMock()
+    entity._schedule_delayed_refresh = MagicMock()
+    client = AsyncMock()
+    client.stop_climate = AsyncMock(return_value=None)
+
+    async def execute_call(func, **kwargs):
+        return await func(client)
+
+    entity._api.async_call = AsyncMock(side_effect=execute_call)
+    await entity.async_turn_off()
+    client.stop_climate.assert_called_once_with(entity._vin)
+
+
+@pytest.mark.asyncio
+async def test_steering_wheel_set_heat_executes_api_call() -> None:
+    """Cover switch.py line 343: inner _call closure in _set_steering_wheel_heat."""
+    entity = _make_steering_wheel_switch()
+    client = AsyncMock()
+    client.set_seat_climate = AsyncMock(return_value=None)
+
+    async def execute_call(func, **kwargs):
+        return await func(client)
+
+    entity._api.async_call = AsyncMock(side_effect=execute_call)
+    await entity.async_turn_on()
+    client.set_seat_climate.assert_called_once()
+
+
+def test_schedule_delayed_refresh_creates_task() -> None:
+    """Cover switch.py lines 253-257: _schedule_delayed_refresh."""
+    entity = _make_car_on_switch()
+    entity.hass = MagicMock()
+    entity._schedule_delayed_refresh()
+    entity.hass.async_create_task.assert_called_once()

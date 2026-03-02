@@ -275,3 +275,28 @@ async def test_lock_async_setup_entry_creates_lock_entity() -> None:
     entities = async_add_entities.call_args[0][0]
     assert len(entities) == 1
     assert isinstance(entities[0], BydLock)
+
+
+def test_byd_lock_init() -> None:
+    """Cover lock.py lines 51-57: BydLock.__init__."""
+    from unittest.mock import MagicMock, patch
+
+    vin = "TESTVIN123"
+    vehicle_mock = MagicMock()
+    coordinator = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.data = {"vehicles": {vin: vehicle_mock}}
+    api_mock = MagicMock()
+
+    with patch(
+        "homeassistant.helpers.update_coordinator.CoordinatorEntity.__init__",
+        return_value=None,
+    ):
+        lock_entity = BydLock(coordinator, api_mock, vin, vehicle_mock)
+
+    assert lock_entity._vin == vin
+    assert lock_entity._vehicle is vehicle_mock
+    assert lock_entity._api is api_mock
+    assert lock_entity._attr_unique_id == f"{vin}_lock"
+    assert lock_entity._last_command is None
+    assert lock_entity._last_locked is None

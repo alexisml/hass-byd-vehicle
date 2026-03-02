@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import types
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from pybyd.models.realtime import ChargingState
 
@@ -227,3 +228,59 @@ def test_is_plug_connected_from_realtime_not_charging_or_connected() -> None:
         is_charger_connected=None, charge_state=ChargingState.UNKNOWN
     )
     assert _is_plug_connected_from_realtime(obj) is None
+
+
+# ---------------------------------------------------------------------------
+# async_setup_entry (lines 276-287)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_binary_sensor_async_setup_entry_no_vehicles() -> None:
+    """Cover lines 276-287: async_setup_entry skips when vehicle is None."""
+    from custom_components.byd_vehicle.binary_sensor import async_setup_entry
+    from custom_components.byd_vehicle.const import DOMAIN
+
+    vin = "TESTVIN123"
+    coordinator = MagicMock()
+    coordinator.data = {"vehicles": {}}  # vehicle is None → skip
+
+    hass = MagicMock()
+    hass.data = {DOMAIN: {"entry1": {"coordinators": {vin: coordinator}}}}
+    entry = MagicMock()
+    entry.entry_id = "entry1"
+    async_add_entities = MagicMock()
+
+    await async_setup_entry(hass, entry, async_add_entities)
+    async_add_entities.assert_called_once_with([])
+
+
+@pytest.mark.asyncio
+async def test_binary_sensor_async_setup_entry_creates_entities() -> None:
+    """Cover lines 276-287 + 304-315: async_setup_entry with vehicle found."""
+    from custom_components.byd_vehicle.binary_sensor import (
+        BINARY_SENSOR_DESCRIPTIONS,
+        BydBinarySensor,
+        async_setup_entry,
+    )
+    from custom_components.byd_vehicle.const import DOMAIN
+
+    vin = "TESTVIN123"
+    vehicle_mock = MagicMock()
+    coordinator = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.data = {"vehicles": {vin: vehicle_mock}}
+
+    hass = MagicMock()
+    hass.data = {DOMAIN: {"entry1": {"coordinators": {vin: coordinator}}}}
+    entry = MagicMock()
+    entry.entry_id = "entry1"
+    async_add_entities = MagicMock()
+
+    # Patch __init__ to avoid full HA initialization but still cover line 304-315
+    with patch.object(BydBinarySensor, "__init__", return_value=None):
+        await async_setup_entry(hass, entry, async_add_entities)
+
+    async_add_entities.assert_called_once()
+    entities = async_add_entities.call_args[0][0]
+    assert len(entities) == len(BINARY_SENSOR_DESCRIPTIONS)

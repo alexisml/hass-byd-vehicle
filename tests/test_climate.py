@@ -376,3 +376,71 @@ async def test_set_preset_mode_invalid_raises() -> None:
     entity = _make_climate()
     with pytest.raises(HomeAssistantError):
         await entity.async_set_preset_mode("invalid_preset")
+
+
+# ---------------------------------------------------------------------------
+# async_setup_entry (lines 33-49)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_climate_async_setup_entry_no_vehicles() -> None:
+    """Cover lines 33-49: async_setup_entry skips when vehicle is None."""
+    from custom_components.byd_vehicle.climate import async_setup_entry
+    from custom_components.byd_vehicle.const import DOMAIN
+
+    vin = "TESTVIN123"
+    coordinator = MagicMock()
+    coordinator.data = {"vehicles": {}}  # vehicle is None → skip
+
+    hass = MagicMock()
+    hass.data = {
+        DOMAIN: {
+            "entry1": {
+                "coordinators": {vin: coordinator},
+                "api": MagicMock(),
+            }
+        }
+    }
+    entry = MagicMock()
+    entry.entry_id = "entry1"
+    entry.options = {}
+    async_add_entities = MagicMock()
+
+    await async_setup_entry(hass, entry, async_add_entities)
+    async_add_entities.assert_called_once_with([])
+
+
+@pytest.mark.asyncio
+async def test_climate_async_setup_entry_creates_entity() -> None:
+    """Cover lines 33-49 + 84-92: entity created and __init__ runs."""
+    from custom_components.byd_vehicle.climate import BydClimate, async_setup_entry
+    from custom_components.byd_vehicle.const import DOMAIN
+
+    vin = "TESTVIN123"
+    vehicle_mock = MagicMock()
+    coordinator = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.data = {"vehicles": {vin: vehicle_mock}}
+
+    hass = MagicMock()
+    hass.data = {
+        DOMAIN: {
+            "entry1": {
+                "coordinators": {vin: coordinator},
+                "api": MagicMock(),
+            }
+        }
+    }
+    entry = MagicMock()
+    entry.entry_id = "entry1"
+    entry.options = {}
+    async_add_entities = MagicMock()
+
+    with patch.object(BydClimate, "__init__", return_value=None):
+        await async_setup_entry(hass, entry, async_add_entities)
+
+    async_add_entities.assert_called_once()
+    entities = async_add_entities.call_args[0][0]
+    assert len(entities) == 1
+    assert isinstance(entities[0], BydClimate)

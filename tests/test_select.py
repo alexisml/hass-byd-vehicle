@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -45,6 +45,11 @@ def test_seat_status_int_value_valid() -> None:
 
 def test_seat_status_invalid_int_returns_off() -> None:
     assert _seat_status_to_option(9999) == "off"
+
+
+def test_seat_status_non_numeric_string_returns_off() -> None:
+    """Cover select.py lines 42-43: except (TypeError, ValueError) branch."""
+    assert _seat_status_to_option("not_a_number") == "off"
 
 
 def test_seat_level_options_nonempty() -> None:
@@ -197,4 +202,111 @@ async def test_async_select_option_invalid_ignores() -> None:
 
     entity._api.async_call = AsyncMock()
     await entity.async_select_option("invalid_option")
+    assert entity._pending_value is None
+
+
+# ---------------------------------------------------------------------------
+# async_setup_entry (lines 121-135)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_select_async_setup_entry_no_vehicles() -> None:
+    """Cover lines 121-135: async_setup_entry skips when vehicle is None."""
+    from custom_components.byd_vehicle.const import DOMAIN
+    from custom_components.byd_vehicle.select import async_setup_entry
+
+    vin = "TESTVIN123"
+    coordinator = MagicMock()
+    coordinator.data = {"vehicles": {}}  # vehicle is None → skip
+
+    hass = MagicMock()
+    hass.data = {
+        DOMAIN: {
+            "entry1": {
+                "coordinators": {vin: coordinator},
+                "api": MagicMock(),
+            }
+        }
+    }
+    entry = MagicMock()
+    entry.entry_id = "entry1"
+    async_add_entities = MagicMock()
+
+    await async_setup_entry(hass, entry, async_add_entities)
+    async_add_entities.assert_called_once_with([])
+
+
+@pytest.mark.asyncio
+async def test_select_async_setup_entry_creates_entities() -> None:
+    """Cover lines 121-135 + 155-162: entity created and __init__ runs."""
+    from custom_components.byd_vehicle.const import DOMAIN
+    from custom_components.byd_vehicle.select import async_setup_entry
+
+    vin = "TESTVIN123"
+    vehicle_mock = MagicMock()
+    coordinator = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.data = {"vehicles": {vin: vehicle_mock}}
+
+    hass = MagicMock()
+    hass.data = {
+        DOMAIN: {
+            "entry1": {
+                "coordinators": {vin: coordinator},
+                "api": MagicMock(),
+            }
+        }
+    }
+    entry = MagicMock()
+    entry.entry_id = "entry1"
+    async_add_entities = MagicMock()
+
+    with patch.object(BydSeatClimateSelect, "__init__", return_value=None):
+        await async_setup_entry(hass, entry, async_add_entities)
+
+    async_add_entities.assert_called_once()
+    entities = async_add_entities.call_args[0][0]
+    assert len(entities) == len(SEAT_CLIMATE_DESCRIPTIONS)
+
+
+@pytest.mark.asyncio
+async def test_async_select_option_valid_executes_command() -> None:
+    """Cover line 199: _call closure calls client.set_seat_climate."""
+    from pybyd.models.control import SeatClimateParams
+
+    entity = _make_select()
+    entity._api = MagicMock()
+    client = MagicMock()
+    client.set_seat_climate = AsyncMock(return_value=None)
+
+    async def execute_call(func, **kwargs):  # **kwargs absorbs vin= and command=
+        return await func(client)
+
+    entity._api.async_call = AsyncMock(side_effect=execute_call)
+    option = SEAT_LEVEL_OPTIONS[0]
+    await entity.async_select_option(option)
+    client.set_seat_climate.assert_called_once()
+
+
+def test_byd_seat_climate_select_init() -> None:
+    """Cover select.py lines 155-162: BydSeatClimateSelect.__init__."""
+    vin = "TESTVIN123"
+    vehicle_mock = MagicMock()
+    coordinator = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.data = {"vehicles": {vin: vehicle_mock}}
+    api_mock = MagicMock()
+    description = SEAT_CLIMATE_DESCRIPTIONS[0]
+
+    with patch(
+        "homeassistant.helpers.update_coordinator.CoordinatorEntity.__init__",
+        return_value=None,
+    ):
+        entity = BydSeatClimateSelect(coordinator, api_mock, vin, vehicle_mock, description)
+
+    assert entity._vin == vin
+    assert entity._vehicle is vehicle_mock
+    assert entity._api is api_mock
+    assert entity.entity_description is description
     assert entity._pending_value is None
