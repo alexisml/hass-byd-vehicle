@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import types
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 
 from custom_components.byd_vehicle.sensor import _normalize_epoch, _round_int_attr
 

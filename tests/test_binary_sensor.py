@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import types
 
+from pybyd.models.realtime import ChargingState
+
 from custom_components.byd_vehicle.binary_sensor import (
     BINARY_SENSOR_DESCRIPTIONS,
     _as_charging_state,
@@ -12,7 +14,6 @@ from custom_components.byd_vehicle.binary_sensor import (
     _is_charging_from_realtime,
     _is_plug_connected_from_realtime,
 )
-from pybyd.models.realtime import ChargingState
 
 
 def test_as_charging_state_none() -> None:

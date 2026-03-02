@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from pybyd.models.realtime import SeatHeatVentState
+
 from custom_components.byd_vehicle.select import (
     SEAT_LEVEL_OPTIONS,
     _seat_status_to_option,
 )
-from pybyd.models.realtime import SeatHeatVentState
 
 
 def test_seat_status_none_returns_off() -> None:

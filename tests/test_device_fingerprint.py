@@ -66,9 +66,19 @@ def test_generate_mac_multicast_bit_clear() -> None:
 
 def test_generate_device_profile_keys() -> None:
     expected_keys = {
-        "ostype", "imei", "mac", "model", "sdk", "mod", "imei_md5",
-        "mobile_brand", "mobile_model", "device_type", "network_type",
-        "os_type", "os_version",
+        "ostype",
+        "imei",
+        "mac",
+        "model",
+        "sdk",
+        "mod",
+        "imei_md5",
+        "mobile_brand",
+        "mobile_model",
+        "device_type",
+        "network_type",
+        "os_type",
+        "os_version",
     }
     profile = generate_device_profile()
     assert expected_keys.issubset(profile.keys())

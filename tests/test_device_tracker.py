@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from custom_components.byd_vehicle import device_tracker
 from homeassistant.components.device_tracker import SourceType
+
+from custom_components.byd_vehicle import device_tracker
 
 
 def test_device_tracker_module_importable() -> None:
