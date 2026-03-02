@@ -108,6 +108,7 @@ def _make_sensor(
     attr_key: str | None = None,
     value_fn=None,
     validator_fn=None,
+    sentinel_minus_one: bool = False,
 ) -> BydSensor:
     """Create a BydSensor without a running HA instance."""
     vin = "TESTVIN123"
@@ -117,6 +118,7 @@ def _make_sensor(
         attr_key=attr_key,
         value_fn=value_fn,
         validator_fn=validator_fn,
+        sentinel_minus_one=sentinel_minus_one,
     )
     coordinator = MagicMock()
     coordinator.last_update_success = True
@@ -337,18 +339,19 @@ def test_normalize_epoch_overflow_returns_none() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_validated_value_minus_one_int_returns_none() -> None:
-    """Numeric -1 (int) from the API is treated as 'not available'."""
+def test_resolve_validated_value_minus_one_returns_none_when_flag_set() -> None:
+    """Numeric -1 is treated as 'not available' when sentinel_minus_one=True."""
     rt = types.SimpleNamespace(oil_percent=-1)
     sensor = _make_sensor(
         data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
         attr_key="oil_percent",
+        sentinel_minus_one=True,
     )
     assert sensor._resolve_validated_value() is None
 
 
-def test_resolve_validated_value_minus_one_float_returns_none() -> None:
-    """Numeric -1.0 (float) from the API is treated as 'not available'."""
+def test_resolve_validated_value_minus_one_float_returns_none_when_flag_set() -> None:
+    """Numeric -1.0 (float) is treated as 'not available' when sentinel_minus_one=True."""
     rt = types.SimpleNamespace(oil_endurance=-1.0)
     sensor = _make_sensor(
         data={
@@ -356,25 +359,27 @@ def test_resolve_validated_value_minus_one_float_returns_none() -> None:
             "vehicles": {"TESTVIN123": MagicMock()},
         },
         attr_key="oil_endurance",
+        sentinel_minus_one=True,
     )
     assert sensor._resolve_validated_value() is None
 
 
+def test_resolve_validated_value_minus_one_passes_through_without_flag() -> None:
+    """-1 is NOT filtered when sentinel_minus_one is False (default)."""
+    rt = types.SimpleNamespace(temp_in_car=-1)
+    sensor = _make_sensor(
+        data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
+        attr_key="temp_in_car",
+    )
+    assert sensor._resolve_validated_value() == -1
+
+
 def test_resolve_validated_value_minus_one_does_not_affect_valid_values() -> None:
-    """Values other than -1 are passed through normally."""
+    """Values other than -1 are passed through normally even with flag set."""
     rt = types.SimpleNamespace(oil_percent=50)
     sensor = _make_sensor(
         data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
         attr_key="oil_percent",
+        sentinel_minus_one=True,
     )
     assert sensor._resolve_validated_value() == 50
-
-
-def test_resolve_validated_value_minus_one_string_not_filtered() -> None:
-    """String '-1' is NOT treated as the sentinel; only numeric -1 is."""
-    rt = types.SimpleNamespace(some_field="-1")
-    sensor = _make_sensor(
-        data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
-        attr_key="some_field",
-    )
-    assert sensor._resolve_validated_value() == "-1"

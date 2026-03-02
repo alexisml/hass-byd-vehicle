@@ -74,6 +74,10 @@ class BydSensorDescription(SensorEntityDescription):
     attr_key: str | None = None
     value_fn: Callable[[Any], Any] | None = None
     validator_fn: FieldValidator | None = None
+    # When True, numeric -1 from the API is treated as "not available".
+    # Use only for sensors where -1 is definitively not a valid reading
+    # (e.g. fuel sensors that return -1 on pure EVs).
+    sentinel_minus_one: bool = False
 
 
 def _round_int_attr(attr: str) -> Callable[[Any], int | None]:
@@ -390,6 +394,7 @@ SENSOR_DESCRIPTIONS: tuple[BydSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfLength.KILOMETERS,
         icon="mdi:gas-station",
         entity_registry_enabled_default=True,
+        sentinel_minus_one=True,
     ),
     BydSensorDescription(
         key="oil_percent",
@@ -397,6 +402,7 @@ SENSOR_DESCRIPTIONS: tuple[BydSensorDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         icon="mdi:gas-station",
         entity_registry_enabled_default=True,
+        sentinel_minus_one=True,
     ),
     BydSensorDescription(
         key="total_oil",
@@ -404,6 +410,7 @@ SENSOR_DESCRIPTIONS: tuple[BydSensorDescription, ...] = (
         icon="mdi:gas-station",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
+        sentinel_minus_one=True,
     ),
     # System indicators
     BydSensorDescription(
@@ -632,8 +639,9 @@ class BydSensor(BydVehicleEntity, SensorEntity):
     def _resolve_validated_value(self) -> Any:
         """Resolve sensor value and apply optional per-entity validation."""
         value = self._resolve_value()
-        # Treat API sentinel value -1 as "not available".
-        if isinstance(value, (int, float)) and value == -1:
+        # Treat API sentinel value -1 as "not available" for sensors where -1
+        # is definitively not a valid reading (e.g. fuel sensors on pure EVs).
+        if self.entity_description.sentinel_minus_one and value == -1:
             value = None
         validator = self.entity_description.validator_fn
         if validator is not None:
