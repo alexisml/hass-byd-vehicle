@@ -162,3 +162,38 @@ async def test_button_press_remote_control_error_is_silent() -> None:
     entity._api.async_call = AsyncMock(side_effect=BydRemoteControlError("nack"))
     # Should not raise - log warning and return
     await entity.async_press()
+
+
+# ---------------------------------------------------------------------------
+# Covering the _call closure paths inside async_press (lines 114-117)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_button_press_call_with_method_none_raises() -> None:
+    """Lines 114-116: getattr returns None when method not found on client."""
+    entity = _make_button()
+
+    async def invoke_handler(handler, **kwargs):
+        client = MagicMock(spec=[])  # spec=[] → getattr returns None
+        return await handler(client)
+
+    entity._api.async_call = invoke_handler
+    with pytest.raises(HomeAssistantError):
+        await entity.async_press()
+
+
+@pytest.mark.asyncio
+async def test_button_press_call_with_method_present_succeeds() -> None:
+    """Line 117: return await method(self._vin) when method exists."""
+    entity = _make_button()
+    method_name = entity.entity_description.method
+
+    async def invoke_handler(handler, **kwargs):
+        client = MagicMock()
+        setattr(client, method_name, AsyncMock(return_value=None))
+        return await handler(client)
+
+    entity._api.async_call = invoke_handler
+    # Should not raise
+    await entity.async_press()
