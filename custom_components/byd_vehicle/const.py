@@ -110,6 +110,7 @@ COUNTRY_OPTIONS: dict[str, tuple[str, str]] = {
     "Thailand": ("TH", "th"),
     "Turkey": ("TR", "tr"),
     "United Kingdom": ("GB", "en"),
+    "Uruguay": ("UY", "es"),
     "Uzbekistan": ("UZ", "uz"),
     "Portugal": ("PT", "pt"),
 }
