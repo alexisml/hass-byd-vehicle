@@ -19,6 +19,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: pip install pytest pytest-asyncio pybyd pytest-homeassistant-custom-component
+        run: pip install pytest pytest-asyncio pytest-cov pybyd pytest-homeassistant-custom-component
       - name: Run tests
-        run: pytest tests/ -v
+        run: pytest tests/ -v --cov=custom_components/byd_vehicle --cov-fail-under=90
