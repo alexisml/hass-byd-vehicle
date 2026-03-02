@@ -41,7 +41,7 @@ from .device_fingerprint import async_generate_device_profile
 _LOGGER = logging.getLogger(__name__)
 
 
-def _sanitize_interval(value: int, default: int, min_value: int, max_value: int) -> int:
+def _sanitize_interval(value: Any, default: int, min_value: int, max_value: int) -> int:
     """Clamp interval values so stale options cannot break scheduling."""
     try:
         parsed = int(value)
