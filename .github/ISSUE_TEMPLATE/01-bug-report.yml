@@ -6,7 +6,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to fill out this bug report.
+        IMPORTANT!: Before filing a bug report, please make sure you have verified your observed bug report with how the BYD mobile app works. 
+        The integration shares the same API as the app, so if the app doesn't work as expected, the integration won't either. If you can reproduce the issue in the app, please report it to BYD support.
 
   - type: textarea
     id: what-happened
@@ -56,7 +57,13 @@ body:
     id: relevant-log-output
     attributes:
       label: Relevant log output
-      description: Please paste relevant logs only and redact VIN, tokens, email, and account identifiers.
+      description: |
+        Please paste relevant **debug** logs. Redact VIN, tokens, email, and account identifiers.
+        To enable debug logging, see [Debug logging instructions](https://github.com/jkaberg/hass-byd-vehicle?tab=readme-ov-file#debug-logging-home-assistant--pybyd).
+
+        ⚠️ Issues without valid debug logs will be automatically closed.
+      placeholder: |
+        2026-03-02 12:00:00.123 DEBUG (MainThread) [custom_components.byd_vehicle] ...
       render: shell
     validations:
       required: true
