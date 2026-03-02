@@ -214,7 +214,7 @@ async def test_async_unload_entry_success() -> None:
     domain_dict.pop.return_value = None  # no entry_data
     hass.data = MagicMock()
     hass.data.__getitem__ = MagicMock(return_value=domain_dict)
-    hass.data.get = MagicMock(return_value={})  # Empty dict → falsy → triggers unregister
+    hass.data.get = MagicMock(return_value={})  # Empty dict → triggers unregister
     hass.services = MagicMock()
     hass.services.async_remove = MagicMock()
 

@@ -223,5 +223,7 @@ def test_is_plug_connected_from_realtime_valid_state() -> None:
 
 
 def test_is_plug_connected_from_realtime_not_charging_or_connected() -> None:
-    obj = types.SimpleNamespace(is_charger_connected=None, charge_state=ChargingState.UNKNOWN)
+    obj = types.SimpleNamespace(
+        is_charger_connected=None, charge_state=ChargingState.UNKNOWN
+    )
     assert _is_plug_connected_from_realtime(obj) is None

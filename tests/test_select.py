@@ -169,11 +169,7 @@ def test_current_option_command_pending_no_pending_value() -> None:
 
 def test_is_command_confirmed_realtime_fallback_matches() -> None:
     """Line 224: hvac attr is None, falls back to realtime."""
-    desc = SEAT_CLIMATE_DESCRIPTIONS[0]  # uses main_seat_heat_state / hvac_attr
-    from pybyd.models.hvac import HvacStatus
-
     # hvac has no mainSeatHeatState → returns None for hvac_attr
-    hvac = HvacStatus()  # mainSeatHeatState not set
     entity = _make_select(hvac_val=None, realtime_val=SeatHeatVentState.LOW)
     entity._pending_value = "low"
     assert entity._is_command_confirmed() is True

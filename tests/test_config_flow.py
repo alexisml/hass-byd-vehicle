@@ -135,7 +135,8 @@ def test_label_to_minutes_non_string_non_int_returns_default() -> None:
 
 
 def test_label_to_minutes_unknown_label_falls_back() -> None:
-    assert _climate_duration_label_to_minutes("unknown label") == DEFAULT_CLIMATE_DURATION
+    result = _climate_duration_label_to_minutes("unknown label")
+    assert result == DEFAULT_CLIMATE_DURATION
 
 
 def test_label_to_minutes_numeric_string_normalizes() -> None:
@@ -232,7 +233,7 @@ async def test_options_flow_step_init_no_input_shows_form() -> None:
     entry.options = {}
     flow = BydVehicleOptionsFlow(entry)
     flow.async_show_form = MagicMock(return_value={"type": "form"})
-    result = await flow.async_step_init(user_input=None)
+    await flow.async_step_init(user_input=None)
     flow.async_show_form.assert_called_once()
 
 
@@ -244,19 +245,19 @@ async def test_options_flow_step_init_with_input_no_climate_duration() -> None:
     flow = BydVehicleOptionsFlow(entry)
     flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
     user_input = {CONF_DEBUG_DUMPS: False}
-    result = await flow.async_step_init(user_input=user_input)
+    await flow.async_step_init(user_input=user_input)
     flow.async_create_entry.assert_called_once_with(title="", data=user_input)
 
 
 @pytest.mark.asyncio
 async def test_options_flow_step_init_with_climate_duration_converts() -> None:
-    """Cover async_step_init when CONF_CLIMATE_DURATION is in user_input (lines 407-413)."""
+    """Cover async_step_init when CONF_CLIMATE_DURATION is in user_input."""
     entry = MagicMock()
     entry.options = {}
     flow = BydVehicleOptionsFlow(entry)
     flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
     user_input = {CONF_CLIMATE_DURATION: "15 min", CONF_DEBUG_DUMPS: False}
-    result = await flow.async_step_init(user_input=user_input)
+    await flow.async_step_init(user_input=user_input)
     call_args = flow.async_create_entry.call_args
     assert call_args[1]["data"][CONF_CLIMATE_DURATION] == 15
 
@@ -332,7 +333,7 @@ def test_async_get_options_flow() -> None:
 
 @pytest.mark.asyncio
 async def test_async_step_reauth() -> None:
-    """Cover lines 383-384: async_step_reauth sets _reauth_entry and calls async_step_user."""
+    """Cover async_step_reauth sets _reauth_entry and calls async_step_user."""
     flow = object.__new__(BydVehicleConfigFlow)
     flow._get_reauth_entry = MagicMock(return_value=MagicMock())
     flow.async_step_user = AsyncMock(return_value={"type": "form"})

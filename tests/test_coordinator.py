@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import types
+from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from custom_components.byd_vehicle.coordinator import BydApi, get_vehicle_display
+
+from custom_components.byd_vehicle.coordinator import (
+    BydApi,
+    BydDataUpdateCoordinator,
+    BydGpsUpdateCoordinator,
+    get_vehicle_display,
+)
 
 
 def test_get_vehicle_display_with_model_name() -> None:
@@ -78,17 +85,9 @@ def test_write_debug_dump_handles_exception_gracefully() -> None:
 # ---------------------------------------------------------------------------
 
 
-from datetime import timedelta
-
-from custom_components.byd_vehicle.coordinator import (
-    BydDataUpdateCoordinator,
-    BydGpsUpdateCoordinator,
-)
-
 
 def _make_telemetry_coordinator() -> BydDataUpdateCoordinator:
     """Create a BydDataUpdateCoordinator bypassing __init__."""
-    from time import monotonic as _mono
 
     coordinator = object.__new__(BydDataUpdateCoordinator)
     coordinator._api = MagicMock()
@@ -210,8 +209,9 @@ class TestBydDataUpdateCoordinatorHelpers:
         assert coordinator._accept_hvac_update(HvacStatus()) is True
 
     def test_accept_hvac_update_true_when_confirmed(self) -> None:
-        from pybyd.models.hvac import HvacOverallStatus, HvacStatus
         from time import monotonic
+
+        from pybyd.models.hvac import HvacOverallStatus, HvacStatus
 
         coordinator = _make_telemetry_coordinator()
         coordinator._optimistic_hvac_until = monotonic() + 60
@@ -221,8 +221,9 @@ class TestBydDataUpdateCoordinatorHelpers:
         assert coordinator._optimistic_hvac_until is None
 
     def test_accept_hvac_update_false_when_mismatch(self) -> None:
-        from pybyd.models.hvac import HvacOverallStatus, HvacStatus
         from time import monotonic
+
+        from pybyd.models.hvac import HvacStatus
 
         coordinator = _make_telemetry_coordinator()
         coordinator._optimistic_hvac_until = monotonic() + 60
@@ -344,7 +345,7 @@ class TestApplyOptimisticHvac:
         coordinator.async_set_updated_data.assert_not_called()
 
     def test_sets_ac_on(self) -> None:
-        from pybyd.models.hvac import HvacOverallStatus, HvacStatus
+        from pybyd.models.hvac import HvacStatus
 
         coordinator = _make_telemetry_coordinator()
         hvac = HvacStatus()
@@ -412,7 +413,8 @@ async def test_async_fetch_hvac_updates_data() -> None:
 @pytest.mark.asyncio
 async def test_async_fetch_hvac_rejected_by_guard() -> None:
     from time import monotonic
-    from pybyd.models.hvac import HvacOverallStatus, HvacStatus
+
+    from pybyd.models.hvac import HvacStatus
 
     coordinator = _make_telemetry_coordinator()
     coordinator.data = {"vehicles": {}}
@@ -639,7 +641,7 @@ async def test_async_call_session_expired_then_retry_fails() -> None:
 
     api = _make_api()
     mock_client = MagicMock()
-    # First call: raises BydSessionExpiredError; second call after retry: BydAuthenticationError
+    # First call: BydSessionExpiredError; retry: BydAuthenticationError
     api._ensure_client = AsyncMock(return_value=mock_client)
     api._invalidate_client = AsyncMock()
     api._entry = MagicMock()
@@ -797,12 +799,8 @@ async def test_async_fetch_hvac_delayed_calls_fetch() -> None:
 
     coordinator = _make_telemetry_coordinator()
     coordinator.async_fetch_hvac = AsyncMock()
-    with patch("asyncio.sleep", new_callable=lambda: (lambda *_: __import__("asyncio").coroutine(lambda: None)())):
-        pass  # skip the patch; instead just call directly with 0 delay
-    coordinator.async_fetch_hvac = AsyncMock()
-    # Call with 0 delay to avoid actual sleep in tests
-    import asyncio
-    with patch("custom_components.byd_vehicle.coordinator.asyncio.sleep", new=AsyncMock()):
+    sleep_target = "custom_components.byd_vehicle.coordinator.asyncio.sleep"
+    with patch(sleep_target, new=AsyncMock()):
         await coordinator.async_fetch_hvac_delayed(0)
     coordinator.async_fetch_hvac.assert_called_once()
 
@@ -813,7 +811,8 @@ async def test_async_fetch_realtime_delayed_calls_fetch() -> None:
 
     coordinator = _make_telemetry_coordinator()
     coordinator.async_fetch_realtime = AsyncMock()
-    with patch("custom_components.byd_vehicle.coordinator.asyncio.sleep", new=AsyncMock()):
+    sleep_target = "custom_components.byd_vehicle.coordinator.asyncio.sleep"
+    with patch(sleep_target, new=AsyncMock()):
         await coordinator.async_fetch_realtime_delayed(0)
     coordinator.async_fetch_realtime.assert_called_once()
 
@@ -824,7 +823,8 @@ async def test_async_fetch_hvac_delayed_handles_exception() -> None:
 
     coordinator = _make_telemetry_coordinator()
     coordinator.async_fetch_hvac = AsyncMock(side_effect=RuntimeError("fetch failed"))
-    with patch("custom_components.byd_vehicle.coordinator.asyncio.sleep", new=AsyncMock()):
+    sleep_target = "custom_components.byd_vehicle.coordinator.asyncio.sleep"
+    with patch(sleep_target, new=AsyncMock()):
         # Should not raise
         await coordinator.async_fetch_hvac_delayed(0)
 
@@ -834,8 +834,11 @@ async def test_async_fetch_realtime_delayed_handles_exception() -> None:
     """async_fetch_realtime_delayed should swallow exceptions."""
 
     coordinator = _make_telemetry_coordinator()
-    coordinator.async_fetch_realtime = AsyncMock(side_effect=RuntimeError("fetch failed"))
-    with patch("custom_components.byd_vehicle.coordinator.asyncio.sleep", new=AsyncMock()):
+    coordinator.async_fetch_realtime = AsyncMock(
+        side_effect=RuntimeError("fetch failed")
+    )
+    sleep_target = "custom_components.byd_vehicle.coordinator.asyncio.sleep"
+    with patch(sleep_target, new=AsyncMock()):
         # Should not raise
         await coordinator.async_fetch_realtime_delayed(0)
 

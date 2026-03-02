@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import types
-from unittest.mock import AsyncMock as _AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock as _AsyncMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from homeassistant.components.climate.const import HVACMode
