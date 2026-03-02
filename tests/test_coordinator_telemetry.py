@@ -355,7 +355,7 @@ async def test_async_fetch_hvac_invokes_fetch_closure() -> None:
 
 @pytest.mark.asyncio
 async def test_telemetry_update_data_polling_disabled_returns_cached() -> None:
-    """Cover lines 488-491: when polling disabled and data is dict, return cached data."""
+    """Cover when polling disabled and data is dict (lines 488-491)."""
     coordinator = _make_telemetry_coordinator()
     coordinator._polling_enabled = False
     coordinator._force_next_refresh = False
@@ -367,8 +367,8 @@ async def test_telemetry_update_data_polling_disabled_returns_cached() -> None:
 
 
 @pytest.mark.asyncio
-async def test_telemetry_update_data_polling_disabled_no_dict_returns_vehicles() -> None:
-    """Cover lines 488-491: when polling disabled and data is not dict, return fallback."""
+async def test_telemetry_update_data_polling_disabled_no_dict() -> None:
+    """Cover when polling disabled and data is not dict (lines 488-491)."""
     coordinator = _make_telemetry_coordinator()
     coordinator._polling_enabled = False
     coordinator._force_next_refresh = False
@@ -400,4 +400,4 @@ async def test_telemetry_update_data_fetch_closure_success() -> None:
 
     result = await coordinator._async_update_data()
     assert coordinator._vin in result["vehicles"]
-    assert coordinator._vin in result.get("realtime", {}) or True  # realtime may be there
+    assert coordinator._vin in result.get("realtime", {})

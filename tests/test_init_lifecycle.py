@@ -9,8 +9,6 @@ from homeassistant.exceptions import ConfigEntryNotReady
 
 from custom_components.byd_vehicle import (
     _async_register_services,
-    _get_coordinators,
-    _resolve_vins_from_call,
     async_reload_entry,
     async_setup_entry,
     async_unload_entry,

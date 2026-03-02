@@ -154,10 +154,7 @@ async def test_switch_async_setup_entry_creates_entities() -> None:
     """Cover lines 31-49 + __init__ lines: entities created when vehicle found."""
     from custom_components.byd_vehicle.const import DOMAIN
     from custom_components.byd_vehicle.switch import (
-        BydBatteryHeatSwitch,
-        BydCarOnSwitch,
         BydDisablePollingSwitch,
-        BydSteeringWheelHeatSwitch,
         async_setup_entry,
     )
 
@@ -181,12 +178,11 @@ async def test_switch_async_setup_entry_creates_entities() -> None:
     entry.entry_id = "entry1"
     async_add_entities = MagicMock()
 
-    with patch.object(BydBatteryHeatSwitch, "__init__", return_value=None), patch.object(
-        BydCarOnSwitch, "__init__", return_value=None
-    ), patch.object(
-        BydSteeringWheelHeatSwitch, "__init__", return_value=None
-    ), patch.object(
-        BydDisablePollingSwitch, "__init__", return_value=None
+    with (
+        patch.object(BydBatteryHeatSwitch, "__init__", return_value=None),
+        patch.object(BydCarOnSwitch, "__init__", return_value=None),
+        patch.object(BydSteeringWheelHeatSwitch, "__init__", return_value=None),
+        patch.object(BydDisablePollingSwitch, "__init__", return_value=None),
     ):
         await async_setup_entry(hass, entry, async_add_entities)
 
@@ -219,7 +215,6 @@ async def test_disable_polling_async_added_to_hass_restores_on_state() -> None:
     """Cover switch.py lines 387-391: async_added_to_hass restores 'on' state."""
     from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-    vin = "TESTVIN123"
     entity = _make_disable_polling_switch()
     entity.coordinator.set_polling_enabled = MagicMock()
 

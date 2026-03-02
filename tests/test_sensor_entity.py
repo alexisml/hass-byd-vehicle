@@ -87,7 +87,10 @@ async def test_sensor_async_setup_entry_no_vehicles() -> None:
 async def test_sensor_async_setup_entry_creates_entities() -> None:
     """Cover lines 530-549 + 580-594: entities created when vehicle found."""
     from custom_components.byd_vehicle.const import DOMAIN
-    from custom_components.byd_vehicle.sensor import SENSOR_DESCRIPTIONS, async_setup_entry
+    from custom_components.byd_vehicle.sensor import (
+        SENSOR_DESCRIPTIONS,
+        async_setup_entry,
+    )
 
     vin = "TESTVIN123"
     vehicle_mock = MagicMock()
@@ -113,7 +116,8 @@ async def test_sensor_async_setup_entry_creates_entities() -> None:
 
     async_add_entities.assert_called_once()
     entities = async_add_entities.call_args[0][0]
-    # All non-gps_last_updated sensors (gps_last_updated skipped when no gps_coordinator)
+    # All non-gps_last_updated sensors (gps_last_updated skipped
+    # when no gps_coordinator)
     gps_count = sum(1 for d in SENSOR_DESCRIPTIONS if d.key == "gps_last_updated")
     expected_count = len(SENSOR_DESCRIPTIONS) - gps_count
     assert len(entities) == expected_count
@@ -152,9 +156,13 @@ def test_sensor_init_auto_disables_when_no_value() -> None:
 
 @pytest.mark.asyncio
 async def test_sensor_async_setup_entry_with_gps_coordinator() -> None:
-    """Cover sensor.py line 543: BydSensor created for gps_last_updated when gps_coordinator exists."""
+    """Cover BydSensor created for gps_last_updated when gps_coordinator exists."""
     from custom_components.byd_vehicle.const import DOMAIN
-    from custom_components.byd_vehicle.sensor import SENSOR_DESCRIPTIONS, BydSensor, async_setup_entry
+    from custom_components.byd_vehicle.sensor import (
+        SENSOR_DESCRIPTIONS,
+        BydSensor,
+        async_setup_entry,
+    )
 
     vin = "TESTVIN123"
     vehicle_mock = MagicMock()

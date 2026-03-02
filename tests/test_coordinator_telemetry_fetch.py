@@ -35,7 +35,7 @@ def _make_telemetry_coordinator() -> BydDataUpdateCoordinator:
 
 @pytest.mark.asyncio
 async def test_telemetry_fetch_endpoint_not_supported_first_time() -> None:
-    """Cover coordinator.py lines 503-511 + 571-579: BydEndpointNotSupportedError first time."""
+    """Cover BydEndpointNotSupportedError first time (lines 503-511 + 571-579)."""
     from pybyd import BydEndpointNotSupportedError
 
     coordinator = _make_telemetry_coordinator()
@@ -63,7 +63,7 @@ async def test_telemetry_fetch_endpoint_not_supported_first_time() -> None:
 
 @pytest.mark.asyncio
 async def test_telemetry_fetch_endpoint_not_supported_subsequent() -> None:
-    """Cover coordinator.py lines 512-517: BydEndpointNotSupportedError subsequent times."""
+    """Cover BydEndpointNotSupportedError subsequent times (lines 512-517)."""
     from pybyd import BydEndpointNotSupportedError
 
     coordinator = _make_telemetry_coordinator()
@@ -87,8 +87,8 @@ async def test_telemetry_fetch_endpoint_not_supported_subsequent() -> None:
 
 
 @pytest.mark.asyncio
-async def test_telemetry_fetch_realtime_recoverable_error_raises_update_failed() -> None:
-    """Cover coordinator.py lines 518-522 + 580-584: _RECOVERABLE_ERRORS in realtime."""
+async def test_telemetry_fetch_realtime_recoverable_error() -> None:
+    """Cover _RECOVERABLE_ERRORS in realtime (lines 518-522 + 580-584)."""
     from homeassistant.helpers.update_coordinator import UpdateFailed
     from pybyd import BydApiError
 
@@ -110,8 +110,8 @@ async def test_telemetry_fetch_realtime_recoverable_error_raises_update_failed()
 
 
 @pytest.mark.asyncio
-async def test_telemetry_fetch_hvac_recoverable_error_and_endpoint_failures_warning() -> None:
-    """Cover coordinator.py lines 532-540 + 587: HVAC _RECOVERABLE_ERRORS + warning."""
+async def test_telemetry_fetch_hvac_recoverable_error_warning() -> None:
+    """Cover HVAC _RECOVERABLE_ERRORS + warning (lines 532-540 + 587)."""
     from pybyd import BydApiError
     from pybyd.models.realtime import VehicleRealtimeData
 
@@ -162,14 +162,14 @@ async def test_telemetry_fetch_hvac_guard_discard() -> None:
     coordinator._api.async_call = AsyncMock(side_effect=invoke_handler)
     coordinator._api.debug_dumps_enabled = False
 
-    result = await coordinator._async_update_data()
+    await coordinator._async_update_data()
     # HVAC was discarded, _last_hvac stays None
     assert coordinator._last_hvac is None
 
 
 @pytest.mark.asyncio
 async def test_telemetry_fetch_hvac_accepted_updates_last_hvac_and_hvac_map() -> None:
-    """Cover coordinator.py lines 554 + 568: HVAC accepted, last_hvac and hvac_map updated."""
+    """Cover HVAC accepted, last_hvac and hvac_map updated (lines 554 + 568)."""
     from pybyd.models.hvac import HvacOverallStatus, HvacStatus
     from pybyd.models.realtime import VehicleRealtimeData
 
@@ -196,7 +196,7 @@ async def test_telemetry_fetch_hvac_accepted_updates_last_hvac_and_hvac_map() ->
 
 @pytest.mark.asyncio
 async def test_telemetry_fetch_debug_dumps_enabled() -> None:
-    """Cover coordinator.py lines 595-602: debug dump created when debug_dumps_enabled."""
+    """Cover debug dump created when debug_dumps_enabled (lines 595-602)."""
     from pybyd.models.realtime import VehicleRealtimeData
 
     coordinator = _make_telemetry_coordinator()

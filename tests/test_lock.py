@@ -184,7 +184,8 @@ async def test_async_lock_executes_api_call() -> None:
     client = AsyncMock()
     client.lock = AsyncMock(return_value=None)
 
-    async def execute_call(func, **kwargs):  # **kwargs absorbs vin= and command= from _execute_command
+    async def execute_call(func, **kwargs):
+        # **kwargs absorbs vin= and command= from _execute_command
         return await func(client)
 
     entity._api.async_call = AsyncMock(side_effect=execute_call)
@@ -199,7 +200,8 @@ async def test_async_unlock_executes_api_call() -> None:
     client = AsyncMock()
     client.unlock = AsyncMock(return_value=None)
 
-    async def execute_call(func, **kwargs):  # **kwargs absorbs vin= and command= from _execute_command
+    async def execute_call(func, **kwargs):
+        # **kwargs absorbs vin= and command= from _execute_command
         return await func(client)
 
     entity._api.async_call = AsyncMock(side_effect=execute_call)

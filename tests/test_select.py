@@ -273,7 +273,6 @@ async def test_select_async_setup_entry_creates_entities() -> None:
 @pytest.mark.asyncio
 async def test_async_select_option_valid_executes_command() -> None:
     """Cover line 199: _call closure calls client.set_seat_climate."""
-    from pybyd.models.control import SeatClimateParams
 
     entity = _make_select()
     entity._api = MagicMock()
@@ -303,7 +302,9 @@ def test_byd_seat_climate_select_init() -> None:
         "homeassistant.helpers.update_coordinator.CoordinatorEntity.__init__",
         return_value=None,
     ):
-        entity = BydSeatClimateSelect(coordinator, api_mock, vin, vehicle_mock, description)
+        entity = BydSeatClimateSelect(
+            coordinator, api_mock, vin, vehicle_mock, description
+        )
 
     assert entity._vin == vin
     assert entity._vehicle is vehicle_mock

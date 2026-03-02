@@ -15,7 +15,6 @@ from custom_components.byd_vehicle.climate import BydClimate
 
 def _make_climate(realtime=None, hvac=None) -> BydClimate:
     """Create a BydClimate bypassing __init__."""
-    from pybyd.models.hvac import HvacOverallStatus, HvacStatus
 
     vin = "TESTVIN123"
     coordinator = MagicMock()
@@ -206,7 +205,6 @@ async def test_climate_async_setup_entry_creates_entity() -> None:
 
 def test_climate_init() -> None:
     """Cover climate.py lines 84-92: BydClimate.__init__."""
-    from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
     coordinator = MagicMock()
     api = MagicMock()
@@ -234,7 +232,6 @@ def test_climate_init() -> None:
 @pytest.mark.asyncio
 async def test_climate_delayed_refresh_closure_runs() -> None:
     """Cover climate.py lines 298-302: inner _delayed coroutine body."""
-    import asyncio as _asyncio
     from unittest.mock import patch as _patch
 
     entity = _make_climate()
@@ -249,7 +246,8 @@ async def test_climate_delayed_refresh_closure_runs() -> None:
 
     entity.hass.async_create_task = capture_task
 
-    with _patch("custom_components.byd_vehicle.climate.asyncio.sleep", new=_AsyncMock()):
+    sleep_mock = _AsyncMock()
+    with _patch("custom_components.byd_vehicle.climate.asyncio.sleep", new=sleep_mock):
         entity._schedule_delayed_refresh()
         assert captured_coro is not None
         await captured_coro

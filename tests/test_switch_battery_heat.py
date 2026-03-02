@@ -177,7 +177,6 @@ async def test_battery_heat_turn_off_executes_api_call() -> None:
 
 def test_battery_heat_switch_init() -> None:
     """Cover switch.py lines 67-72: BydBatteryHeatSwitch.__init__."""
-    from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
     coordinator = MagicMock()
     api = MagicMock()

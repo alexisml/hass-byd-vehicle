@@ -184,7 +184,6 @@ async def test_steering_wheel_set_heat_executes_api_call() -> None:
 
 def test_steering_wheel_heat_switch_init() -> None:
     """Cover switch.py lines 280-285: BydSteeringWheelHeatSwitch.__init__."""
-    from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
     coordinator = MagicMock()
     api = MagicMock()

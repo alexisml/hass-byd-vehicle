@@ -263,6 +263,7 @@ async def test_ensure_client_creates_new_when_none() -> None:
 
 def test_bydapi_init_creates_instance() -> None:
     """Cover coordinator.py lines 90-112: BydApi.__init__."""
+
     from custom_components.byd_vehicle.const import (
         CONF_BASE_URL,
         CONF_CONTROL_PIN,
@@ -272,9 +273,7 @@ def test_bydapi_init_creates_instance() -> None:
         CONF_LANGUAGE,
         DEFAULT_DEBUG_DUMPS,
         DEFAULT_LANGUAGE,
-        DOMAIN,
     )
-    from pybyd.config import DeviceProfile
 
     device_profile = {
         "model": "TestModel",

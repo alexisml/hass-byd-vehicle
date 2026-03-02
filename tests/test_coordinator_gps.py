@@ -177,7 +177,7 @@ async def test_async_fetch_gps_invokes_fetch_closure() -> None:
 
 @pytest.mark.asyncio
 async def test_gps_update_data_polling_disabled_returns_cached() -> None:
-    """Cover lines 859-862: when polling disabled and data is dict, return cached data."""
+    """Cover when polling disabled and data is dict (lines 859-862)."""
     coordinator = _make_gps_coordinator()
     coordinator._polling_enabled = False
     coordinator._force_next_refresh = False
@@ -225,7 +225,7 @@ async def test_gps_update_data_fetch_closure_success() -> None:
 
 @pytest.mark.asyncio
 async def test_gps_fetch_recoverable_error_raises_update_failed() -> None:
-    """Cover coordinator.py lines 870-873 + 893: GPS _RECOVERABLE_ERRORS → UpdateFailed."""
+    """Cover GPS _RECOVERABLE_ERRORS → UpdateFailed (lines 870-873 + 893)."""
     from homeassistant.helpers.update_coordinator import UpdateFailed
     from pybyd import BydApiError
 

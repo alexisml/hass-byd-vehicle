@@ -184,7 +184,7 @@ async def test_car_on_turn_on_executes_api_call() -> None:
 
 @pytest.mark.asyncio
 async def test_car_on_turn_off_executes_api_call() -> None:
-    """Cover switch.py line 217: inner _call closure in BydCarOnSwitch.async_turn_off."""
+    """Cover inner _call closure in BydCarOnSwitch.async_turn_off."""
     entity = _make_car_on_switch()
     entity.coordinator.apply_optimistic_hvac = MagicMock()
     entity._schedule_delayed_refresh = MagicMock()
@@ -201,7 +201,6 @@ async def test_car_on_turn_off_executes_api_call() -> None:
 
 def test_car_on_switch_init() -> None:
     """Cover switch.py lines 155-160: BydCarOnSwitch.__init__."""
-    from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
     coordinator = MagicMock()
     api = MagicMock()
