@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from pybyd.models.realtime import SeatHeatVentState
 
@@ -155,3 +156,45 @@ def test_handle_coordinator_update_keeps_pending_when_not_confirmed() -> None:
     with patch.object(CoordinatorEntity, "_handle_coordinator_update"):
         entity._handle_coordinator_update()
     assert entity._pending_value == "high"
+
+
+def test_current_option_command_pending_no_pending_value() -> None:
+    """Line 170: _command_pending=True and _pending_value=None."""
+    entity = _make_select()
+    entity._command_pending = True
+    entity._pending_value = None
+    result = entity.current_option
+    assert result is None
+
+
+def test_is_command_confirmed_realtime_fallback_matches() -> None:
+    """Line 224: hvac attr is None, falls back to realtime."""
+    # hvac has no mainSeatHeatState → returns None for hvac_attr
+    entity = _make_select(hvac_val=None, realtime_val=SeatHeatVentState.LOW)
+    entity._pending_value = "low"
+    assert entity._is_command_confirmed() is True
+
+
+@pytest.mark.asyncio
+async def test_async_select_option_valid() -> None:
+    """Test async_select_option with a valid option."""
+    entity = _make_select()
+    entity._api = MagicMock()
+    from unittest.mock import AsyncMock
+
+    entity._api.async_call = AsyncMock()
+    await entity.async_select_option("low")
+    assert entity._pending_value == "low"
+    assert entity._command_pending is True
+
+
+@pytest.mark.asyncio
+async def test_async_select_option_invalid_ignores() -> None:
+    """Test async_select_option with an invalid option is silently ignored."""
+    entity = _make_select()
+    entity._api = MagicMock()
+    from unittest.mock import AsyncMock
+
+    entity._api.async_call = AsyncMock()
+    await entity.async_select_option("invalid_option")
+    assert entity._pending_value is None

@@ -114,3 +114,13 @@ def test_extra_state_attributes_no_gps() -> None:
     assert attrs["gps_speed"] is None
     assert attrs["gps_direction"] is None
     assert attrs["gps_timestamp"] is None
+
+
+def test_available_false_when_super_not_available() -> None:
+    """Line 55: return False when super().available is False."""
+    from custom_components.byd_vehicle.entity import BydVehicleEntity
+
+    tracker = _make_tracker(gps_obj=_make_gps())
+    prop = property(lambda self: False)
+    with patch.object(BydVehicleEntity, "available", new_callable=lambda: prop):
+        assert tracker.available is False

@@ -229,3 +229,89 @@ def test_available_true_when_source_obj_present() -> None:
     prop = property(lambda self: True)
     with patch.object(CoordinatorEntity, "available", new_callable=lambda: prop):
         assert sensor.available is True
+
+
+# ---------------------------------------------------------------------------
+# native_unit_of_measurement for tire pressure sensors
+# ---------------------------------------------------------------------------
+
+
+def test_native_unit_tire_pressure_bar() -> None:
+    from homeassistant.const import UnitOfPressure
+    from pybyd.models.realtime import TirePressureUnit
+
+    rt = types.SimpleNamespace(
+        left_front_tire_pressure=2.3,
+        tire_press_unit=TirePressureUnit.BAR,
+    )
+    sensor = _make_sensor(
+        data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
+        key="left_front_tire_pressure",
+        attr_key="left_front_tire_pressure",
+    )
+    prop = property(lambda self: True)
+    with patch.object(CoordinatorEntity, "available", new_callable=lambda: prop):
+        unit = sensor.native_unit_of_measurement
+    assert unit == UnitOfPressure.BAR
+
+
+def test_native_unit_tire_pressure_falls_back_to_desc_unit() -> None:
+    rt = types.SimpleNamespace(
+        left_front_tire_pressure=None,
+        tire_press_unit=None,
+    )
+    sensor = _make_sensor(
+        data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
+        key="left_front_tire_pressure",
+        attr_key="left_front_tire_pressure",
+    )
+    # Should return whatever is set on the description (None here since we're
+    # using a plain BydSensorDescription without a unit).
+    unit = sensor.native_unit_of_measurement
+    assert unit is None
+
+
+def test_native_unit_non_tire_sensor_returns_desc_unit() -> None:
+    rt = types.SimpleNamespace(battery_level=80)
+    sensor = _make_sensor(
+        data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
+        attr_key="battery_level",
+    )
+    # No unit set in description → None
+    assert sensor.native_unit_of_measurement is None
+
+
+# ---------------------------------------------------------------------------
+# available for last_updated / gps_last_updated sensors
+# ---------------------------------------------------------------------------
+
+
+def test_available_last_updated_true_when_timestamp_present() -> None:
+    from datetime import UTC, datetime
+
+    ts = datetime(2024, 1, 1, tzinfo=UTC)
+    rt = types.SimpleNamespace(timestamp=ts)
+    sensor = _make_sensor(
+        data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
+        key="last_updated",
+    )
+    prop = property(lambda self: True)
+    with patch.object(CoordinatorEntity, "available", new_callable=lambda: prop):
+        assert sensor.available is True
+
+
+def test_available_last_updated_false_when_no_realtime() -> None:
+    sensor = _make_sensor(
+        data={"vehicles": {"TESTVIN123": MagicMock()}},
+        key="last_updated",
+    )
+    prop = property(lambda self: True)
+    with patch.object(CoordinatorEntity, "available", new_callable=lambda: prop):
+        assert sensor.available is False
+
+
+def test_normalize_epoch_overflow_returns_none() -> None:
+    """_normalize_epoch should return None on OverflowError."""
+    # A huge integer will cause OverflowError in datetime.fromtimestamp
+    result = _normalize_epoch(2**63)
+    assert result is None
