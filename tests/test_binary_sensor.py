@@ -201,3 +201,27 @@ def test_handle_coordinator_update_no_value_no_change() -> None:
         sensor._handle_coordinator_update()
     # last_is_on unchanged because _resolve_value() returned None
     assert sensor._last_is_on is True
+
+
+def test_is_charging_from_realtime_valid_state() -> None:
+    """Line 63: charge_state is a valid non-None ChargingState."""
+    obj = types.SimpleNamespace(is_charging=None, charge_state=ChargingState.CHARGING)
+    assert _is_charging_from_realtime(obj) is True
+
+
+def test_is_charging_from_realtime_connected_is_not_charging() -> None:
+    obj = types.SimpleNamespace(is_charging=None, charge_state=ChargingState.CONNECTED)
+    assert _is_charging_from_realtime(obj) is False
+
+
+def test_is_plug_connected_from_realtime_valid_state() -> None:
+    """Line 75: charge_state determines plug connection."""
+    obj = types.SimpleNamespace(
+        is_charger_connected=None, charge_state=ChargingState.CONNECTED
+    )
+    assert _is_plug_connected_from_realtime(obj) is True
+
+
+def test_is_plug_connected_from_realtime_not_charging_or_connected() -> None:
+    obj = types.SimpleNamespace(is_charger_connected=None, charge_state=ChargingState.UNKNOWN)
+    assert _is_plug_connected_from_realtime(obj) is None

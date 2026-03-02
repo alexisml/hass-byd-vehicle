@@ -151,3 +151,29 @@ def test_extra_state_attributes_no_last_command() -> None:
     entity = _make_lock()
     attrs = entity.extra_state_attributes
     assert "last_remote_command" not in attrs
+
+
+# ---------------------------------------------------------------------------
+# async_lock and async_unlock
+# ---------------------------------------------------------------------------
+
+
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_async_lock_sets_last_command_and_pending() -> None:
+    entity = _make_lock()
+    await entity.async_lock()
+    assert entity._last_command == "lock"
+    assert entity._last_locked is True
+    assert entity._command_pending is True
+
+
+@pytest.mark.asyncio
+async def test_async_unlock_sets_last_command_and_pending() -> None:
+    entity = _make_lock()
+    await entity.async_unlock()
+    assert entity._last_command == "unlock"
+    assert entity._last_locked is False
+    assert entity._command_pending is True
