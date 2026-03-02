@@ -2,6 +2,8 @@ name: Tests
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 jobs:
@@ -17,8 +19,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest pytest-asyncio pybyd pytest-homeassistant-custom-component
+        run: pip install pytest pytest-asyncio pybyd pytest-homeassistant-custom-component
       - name: Run tests
         run: pytest tests/ -v
