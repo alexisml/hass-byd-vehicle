@@ -284,3 +284,53 @@ async def test_binary_sensor_async_setup_entry_creates_entities() -> None:
     async_add_entities.assert_called_once()
     entities = async_add_entities.call_args[0][0]
     assert len(entities) == len(BINARY_SENSOR_DESCRIPTIONS)
+
+
+# ---------------------------------------------------------------------------
+# BydBinarySensor.__init__ auto-disable logic (lines 304-315)
+# ---------------------------------------------------------------------------
+
+
+def _fake_coordinator_init(self, coordinator, **_):
+    """Minimal stand-in for CoordinatorEntity.__init__."""
+    self.coordinator = coordinator
+
+
+def test_binary_sensor_init_auto_disables_when_no_value() -> None:
+    """Cover binary_sensor.py lines 304-315: __init__ disables entity when no data."""
+    desc = BINARY_SENSOR_DESCRIPTIONS[0]
+    vin = "TESTVIN123"
+    # Coordinator with no source data → _resolve_value returns None → auto-disable
+    coordinator = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.data = {"vehicles": {vin: MagicMock()}}
+    vehicle = MagicMock()
+
+    with patch.object(CoordinatorEntity, "__init__", new=_fake_coordinator_init):
+        sensor = BydBinarySensor(coordinator, vin, vehicle, desc)
+
+    assert sensor._attr_entity_registry_enabled_default is False
+
+
+def test_binary_sensor_init_stays_enabled_when_value_present() -> None:
+    """Cover binary_sensor.py line 313-314: entity stays enabled when data present."""
+    import types as _types
+
+    desc = BINARY_SENSOR_DESCRIPTIONS[0]
+    vin = "TESTVIN123"
+    # Provide realtime data so _resolve_value returns something non-None
+    rt = _types.SimpleNamespace(is_online=True)
+    coordinator = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.data = {
+        "vehicles": {vin: MagicMock()},
+        desc.source: {vin: rt},
+    }
+    vehicle = MagicMock()
+
+    with patch.object(CoordinatorEntity, "__init__", new=_fake_coordinator_init):
+        sensor = BydBinarySensor(coordinator, vin, vehicle, desc)
+
+    # Should NOT have been auto-disabled
+    assert not hasattr(sensor, "_attr_entity_registry_enabled_default") or \
+        sensor._attr_entity_registry_enabled_default is not False

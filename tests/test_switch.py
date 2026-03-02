@@ -720,3 +720,156 @@ def test_schedule_delayed_refresh_creates_task() -> None:
     entity.hass = MagicMock()
     entity._schedule_delayed_refresh()
     entity.hass.async_create_task.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# __init__ constructors (lines 67-72, 155-160, 280-285, 378-383)
+# ---------------------------------------------------------------------------
+
+
+def _fake_coordinator_init(self, coordinator, **_):
+    """Minimal stand-in for CoordinatorEntity.__init__."""
+    self.coordinator = coordinator
+
+
+def test_battery_heat_switch_init() -> None:
+    """Cover switch.py lines 67-72: BydBatteryHeatSwitch.__init__."""
+    from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+    coordinator = MagicMock()
+    api = MagicMock()
+    vin = "TESTVIN123"
+    vehicle = MagicMock()
+
+    with patch.object(CoordinatorEntity, "__init__", new=_fake_coordinator_init):
+        sw = BydBatteryHeatSwitch(coordinator, api, vin, vehicle)
+
+    assert sw._api is api
+    assert sw._vin == vin
+    assert sw._vehicle is vehicle
+    assert sw._attr_unique_id == f"{vin}_switch_battery_heat"
+    assert sw._last_state is None
+
+
+def test_car_on_switch_init() -> None:
+    """Cover switch.py lines 155-160: BydCarOnSwitch.__init__."""
+    from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+    coordinator = MagicMock()
+    api = MagicMock()
+    vin = "TESTVIN123"
+    vehicle = MagicMock()
+
+    with patch.object(CoordinatorEntity, "__init__", new=_fake_coordinator_init):
+        sw = BydCarOnSwitch(coordinator, api, vin, vehicle)
+
+    assert sw._api is api
+    assert sw._vin == vin
+    assert sw._vehicle is vehicle
+    assert sw._attr_unique_id == f"{vin}_switch_car_on"
+    assert sw._last_state is None
+
+
+def test_steering_wheel_heat_switch_init() -> None:
+    """Cover switch.py lines 280-285: BydSteeringWheelHeatSwitch.__init__."""
+    from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+    coordinator = MagicMock()
+    api = MagicMock()
+    vin = "TESTVIN123"
+    vehicle = MagicMock()
+
+    with patch.object(CoordinatorEntity, "__init__", new=_fake_coordinator_init):
+        sw = BydSteeringWheelHeatSwitch(coordinator, api, vin, vehicle)
+
+    assert sw._api is api
+    assert sw._vin == vin
+    assert sw._vehicle is vehicle
+    assert sw._attr_unique_id == f"{vin}_switch_steering_wheel_heat"
+    assert sw._last_state is None
+
+
+def test_disable_polling_switch_init() -> None:
+    """Cover switch.py lines 378-383: BydDisablePollingSwitch.__init__."""
+    from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+    coordinator = MagicMock()
+    gps_coordinator = MagicMock()
+    vin = "TESTVIN123"
+    vehicle = MagicMock()
+
+    with patch.object(CoordinatorEntity, "__init__", new=_fake_coordinator_init):
+        sw = BydDisablePollingSwitch(coordinator, gps_coordinator, vin, vehicle)
+
+    assert sw._vin == vin
+    assert sw._vehicle is vehicle
+    assert sw._gps_coordinator is gps_coordinator
+    assert sw._attr_unique_id == f"{vin}_switch_disable_polling"
+    assert sw._disabled is False
+
+
+# ---------------------------------------------------------------------------
+# _schedule_delayed_refresh inner _delayed closure (lines 254-255)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_car_on_switch_delayed_refresh_closure_runs() -> None:
+    """Cover switch.py lines 254-255: inner _delayed coroutine body."""
+    entity = _make_car_on_switch()
+    entity.hass = MagicMock()
+    entity.coordinator.async_force_refresh = AsyncMock()
+
+    captured_coro = None
+
+    def capture_task(coro):
+        nonlocal captured_coro
+        captured_coro = coro
+
+    entity.hass.async_create_task = capture_task
+
+    with patch("custom_components.byd_vehicle.switch.asyncio.sleep", new=AsyncMock()):
+        entity._schedule_delayed_refresh()
+        assert captured_coro is not None
+        await captured_coro
+
+    entity.coordinator.async_force_refresh.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# BydDisablePollingSwitch.async_added_to_hass (lines 387-391)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_disable_polling_async_added_to_hass_restores_on_state() -> None:
+    """Cover switch.py lines 387-391: async_added_to_hass restores 'on' state."""
+    from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+    vin = "TESTVIN123"
+    entity = _make_disable_polling_switch()
+    entity.coordinator.set_polling_enabled = MagicMock()
+
+    last_state = MagicMock()
+    last_state.state = "on"
+    entity.async_get_last_state = AsyncMock(return_value=last_state)
+
+    with patch.object(CoordinatorEntity, "async_added_to_hass", new=AsyncMock()):
+        await entity.async_added_to_hass()
+
+    assert entity._disabled is True
+
+
+@pytest.mark.asyncio
+async def test_disable_polling_async_added_to_hass_no_previous_state() -> None:
+    """Cover switch.py line 389: async_added_to_hass when last state is None."""
+    from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+    entity = _make_disable_polling_switch()
+    entity.coordinator.set_polling_enabled = MagicMock()
+    entity.async_get_last_state = AsyncMock(return_value=None)
+
+    with patch.object(CoordinatorEntity, "async_added_to_hass", new=AsyncMock()):
+        await entity.async_added_to_hass()
+
+    assert entity._disabled is False

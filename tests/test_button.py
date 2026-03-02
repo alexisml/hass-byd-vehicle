@@ -265,3 +265,51 @@ async def test_button_async_setup_entry_creates_entities() -> None:
     entities = async_add_entities.call_args[0][0]
     # 1 BydForcePollButton + N BydButton descriptions
     assert len(entities) == 1 + len(BUTTON_DESCRIPTIONS)
+
+
+# ---------------------------------------------------------------------------
+# __init__ constructors (lines 94-100, 148-152)
+# ---------------------------------------------------------------------------
+
+
+def _fake_coordinator_init(self, coordinator, **_):
+    """Minimal stand-in for CoordinatorEntity.__init__."""
+    self.coordinator = coordinator
+
+
+def test_byd_button_init() -> None:
+    """Cover button.py lines 94-100: BydButton.__init__."""
+    from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+    desc = BUTTON_DESCRIPTIONS[0]
+    coordinator = MagicMock()
+    api = MagicMock()
+    vin = "TESTVIN123"
+    vehicle = MagicMock()
+
+    with patch.object(CoordinatorEntity, "__init__", new=_fake_coordinator_init):
+        btn = BydButton(coordinator, api, vin, vehicle, desc)
+
+    assert btn._api is api
+    assert btn._vin == vin
+    assert btn._vehicle is vehicle
+    assert btn.entity_description is desc
+    assert btn._attr_unique_id == f"{vin}_button_{desc.key}"
+
+
+def test_force_poll_button_init() -> None:
+    """Cover button.py lines 148-152: BydForcePollButton.__init__."""
+    from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+    coordinator = MagicMock()
+    gps_coordinator = MagicMock()
+    vin = "TESTVIN123"
+    vehicle = MagicMock()
+
+    with patch.object(CoordinatorEntity, "__init__", new=_fake_coordinator_init):
+        btn = BydForcePollButton(coordinator, gps_coordinator, vin, vehicle)
+
+    assert btn._vin == vin
+    assert btn._vehicle is vehicle
+    assert btn._gps_coordinator is gps_coordinator
+    assert btn._attr_unique_id == f"{vin}_button_force_poll"

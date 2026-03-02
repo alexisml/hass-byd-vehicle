@@ -444,3 +444,143 @@ async def test_climate_async_setup_entry_creates_entity() -> None:
     entities = async_add_entities.call_args[0][0]
     assert len(entities) == 1
     assert isinstance(entities[0], BydClimate)
+
+
+# ---------------------------------------------------------------------------
+# BydClimate.__init__ (lines 84-92)
+# ---------------------------------------------------------------------------
+
+
+def _fake_coordinator_init(self, coordinator, **_):
+    """Minimal stand-in for CoordinatorEntity.__init__."""
+    self.coordinator = coordinator
+
+
+def test_climate_init() -> None:
+    """Cover climate.py lines 84-92: BydClimate.__init__."""
+    from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+    coordinator = MagicMock()
+    api = MagicMock()
+    vin = "TESTVIN123"
+    vehicle = MagicMock()
+    climate_duration = 15
+
+    with patch.object(CoordinatorEntity, "__init__", new=_fake_coordinator_init):
+        climate = BydClimate(coordinator, api, vin, vehicle, climate_duration)
+
+    assert climate._api is api
+    assert climate._vin == vin
+    assert climate._vehicle is vehicle
+    assert climate._attr_unique_id == f"{vin}_climate"
+    assert climate._last_mode is HVACMode.OFF
+    assert climate._last_command is None
+    assert climate._pending_target_temp is None
+
+
+# ---------------------------------------------------------------------------
+# _schedule_delayed_refresh inner _delayed closure (lines 298-302)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_climate_delayed_refresh_closure_runs() -> None:
+    """Cover climate.py lines 298-302: inner _delayed coroutine body."""
+    import asyncio as _asyncio
+    from unittest.mock import patch as _patch
+
+    entity = _make_climate()
+    entity.hass = MagicMock()
+    entity.coordinator.async_force_refresh = _AsyncMock()
+
+    captured_coro = None
+
+    def capture_task(coro):
+        nonlocal captured_coro
+        captured_coro = coro
+
+    entity.hass.async_create_task = capture_task
+
+    with _patch("custom_components.byd_vehicle.climate.asyncio.sleep", new=_AsyncMock()):
+        entity._schedule_delayed_refresh()
+        assert captured_coro is not None
+        await captured_coro
+
+    entity.coordinator.async_force_refresh.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Inner _call closure bodies (lines 175-177, 220, 259)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_async_set_hvac_mode_off_call_invokes_stop_climate() -> None:
+    """Cover climate.py line 176: _call body calls stop_climate when mode=OFF."""
+    entity = _make_climate()
+    entity.hass = MagicMock()
+    client = MagicMock()
+    client.stop_climate = _AsyncMock(return_value=None)
+
+    async def execute_call(func, **kwargs):
+        return await func(client)
+
+    entity._api.async_call = _AsyncMock(side_effect=execute_call)
+    entity.async_write_ha_state = MagicMock()
+    await entity.async_set_hvac_mode(HVACMode.OFF)
+    client.stop_climate.assert_called_once_with(entity._vin)
+
+
+@pytest.mark.asyncio
+async def test_async_set_hvac_mode_on_call_invokes_start_climate() -> None:
+    """Cover climate.py line 177: _call body calls start_climate when mode=HEAT_COOL."""
+    entity = _make_climate()
+    entity.hass = MagicMock()
+    client = MagicMock()
+    client.start_climate = _AsyncMock(return_value=None)
+
+    async def execute_call(func, **kwargs):
+        return await func(client)
+
+    entity._api.async_call = _AsyncMock(side_effect=execute_call)
+    entity.async_write_ha_state = MagicMock()
+    await entity.async_set_hvac_mode(HVACMode.HEAT_COOL)
+    client.start_climate.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_async_set_temperature_when_on_invokes_start_climate() -> None:
+    """Cover climate.py line 220: _call closure invoked when climate is on."""
+    from homeassistant.const import ATTR_TEMPERATURE
+
+    entity = _make_climate()
+    # Simulate climate currently on
+    entity._command_pending = True
+    entity._last_mode = HVACMode.HEAT_COOL
+
+    client = MagicMock()
+    client.start_climate = _AsyncMock(return_value=None)
+
+    async def execute_call(func, **kwargs):
+        return await func(client)
+
+    entity._api.async_call = _AsyncMock(side_effect=execute_call)
+    entity.async_write_ha_state = MagicMock()
+    await entity.async_set_temperature(**{ATTR_TEMPERATURE: 22.0})
+    client.start_climate.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_async_set_preset_mode_call_invokes_start_climate() -> None:
+    """Cover climate.py line 259: _call closure body in async_set_preset_mode."""
+    entity = _make_climate()
+    client = MagicMock()
+    client.start_climate = _AsyncMock(return_value=None)
+
+    async def execute_call(func, **kwargs):
+        return await func(client)
+
+    entity._api.async_call = _AsyncMock(side_effect=execute_call)
+    entity.async_write_ha_state = MagicMock()
+    await entity.async_set_preset_mode("max_heat")
+    client.start_climate.assert_called_once()
