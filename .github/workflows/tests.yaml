@@ -1,0 +1,24 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install pytest pytest-asyncio pytest-cov pybyd==0.0.51 homeassistant
+      - name: Run tests
+        run: pytest tests/ -v --cov=custom_components/byd_vehicle --cov-fail-under=45
