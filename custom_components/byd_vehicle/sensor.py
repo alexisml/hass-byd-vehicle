@@ -44,7 +44,13 @@ def _normalize_epoch(value: Any) -> datetime | None:
     # pyBYD already parses timestamps into datetime via BydTimestamp.
     if isinstance(value, datetime):
         if value.tzinfo is None:
-            return value.replace(tzinfo=UTC)
+            value = value.replace(tzinfo=UTC)
+        # Treat epoch 0 or before as an invalid sentinel (API "not available").
+        try:
+            if value.timestamp() <= 0:
+                return None
+        except (OSError, OverflowError, ValueError):
+            return None
         return value
     try:
         ts = float(value)
@@ -626,6 +632,9 @@ class BydSensor(BydVehicleEntity, SensorEntity):
     def _resolve_validated_value(self) -> Any:
         """Resolve sensor value and apply optional per-entity validation."""
         value = self._resolve_value()
+        # Treat API sentinel value -1 as "not available".
+        if isinstance(value, (int, float)) and value == -1:
+            value = None
         validator = self.entity_description.validator_fn
         if validator is not None:
             value = validator(self._last_native_value, value)
