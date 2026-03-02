@@ -1,8 +1,18 @@
-"""Unit tests for _sanitize_interval in __init__.py."""
+"""Unit tests for __init__.py pure helper functions."""
 
 from __future__ import annotations
 
-from custom_components.byd_vehicle import _sanitize_interval
+from unittest.mock import MagicMock, patch
+
+import pytest
+from homeassistant.exceptions import HomeAssistantError
+
+from custom_components.byd_vehicle import (
+    _get_coordinators,
+    _resolve_vins_from_call,
+    _sanitize_interval,
+)
+from custom_components.byd_vehicle.const import DOMAIN
 
 
 def test_below_min_clamped_to_min() -> None:
@@ -35,3 +45,104 @@ def test_none_returns_default() -> None:
 
 def test_numeric_string_parsed() -> None:
     assert _sanitize_interval("30", 10, 5, 60) == 30
+
+
+# ---------------------------------------------------------------------------
+# _resolve_vins_from_call
+# ---------------------------------------------------------------------------
+
+
+def _make_hass(vin: str = "VIN123", entry_id: str = "entry1") -> MagicMock:
+    hass = MagicMock()
+    hass.data = {
+        DOMAIN: {
+            entry_id: {
+                "coordinators": {vin: MagicMock()},
+            }
+        }
+    }
+    return hass
+
+
+def test_resolve_vins_from_call_returns_entry_vin_pair() -> None:
+    hass = _make_hass()
+    device = MagicMock()
+    device.identifiers = {(DOMAIN, "VIN123")}
+    dev_reg = MagicMock()
+    dev_reg.async_get.return_value = device
+    call = MagicMock()
+    call.data = {"device_id": ["dev1"]}
+    with patch("custom_components.byd_vehicle.dr.async_get", return_value=dev_reg):
+        result = _resolve_vins_from_call(hass, call)
+    assert result == [("entry1", "VIN123")]
+
+
+def test_resolve_vins_from_call_string_device_id() -> None:
+    hass = _make_hass()
+    device = MagicMock()
+    device.identifiers = {(DOMAIN, "VIN123")}
+    dev_reg = MagicMock()
+    dev_reg.async_get.return_value = device
+    call = MagicMock()
+    # single string instead of list
+    call.data = {"device_id": "dev1"}
+    with patch("custom_components.byd_vehicle.dr.async_get", return_value=dev_reg):
+        result = _resolve_vins_from_call(hass, call)
+    assert result == [("entry1", "VIN123")]
+
+
+def test_resolve_vins_from_call_no_results_raises() -> None:
+    hass = _make_hass()
+    dev_reg = MagicMock()
+    dev_reg.async_get.return_value = None
+    call = MagicMock()
+    call.data = {"device_id": ["unknown_dev"]}
+    with patch("custom_components.byd_vehicle.dr.async_get", return_value=dev_reg):
+        with pytest.raises(HomeAssistantError):
+            _resolve_vins_from_call(hass, call)
+
+
+def test_resolve_vins_from_call_empty_device_ids_raises() -> None:
+    hass = _make_hass()
+    dev_reg = MagicMock()
+    call = MagicMock()
+    call.data = {"device_id": []}
+    with patch("custom_components.byd_vehicle.dr.async_get", return_value=dev_reg):
+        with pytest.raises(HomeAssistantError):
+            _resolve_vins_from_call(hass, call)
+
+
+# ---------------------------------------------------------------------------
+# _get_coordinators
+# ---------------------------------------------------------------------------
+
+
+def test_get_coordinators_returns_telemetry_and_gps() -> None:
+    tel = MagicMock()
+    gps = MagicMock()
+    hass = MagicMock()
+    hass.data = {
+        DOMAIN: {
+            "entry1": {
+                "coordinators": {"VIN123": tel},
+                "gps_coordinators": {"VIN123": gps},
+            }
+        }
+    }
+    result = _get_coordinators(hass, "entry1", "VIN123")
+    assert result == (tel, gps)
+
+
+def test_get_coordinators_no_gps_returns_none() -> None:
+    tel = MagicMock()
+    hass = MagicMock()
+    hass.data = {
+        DOMAIN: {
+            "entry1": {
+                "coordinators": {"VIN123": tel},
+            }
+        }
+    }
+    result = _get_coordinators(hass, "entry1", "VIN123")
+    assert result[0] is tel
+    assert result[1] is None

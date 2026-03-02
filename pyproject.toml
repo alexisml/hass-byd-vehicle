@@ -19,3 +19,7 @@ warn_unused_configs = true
 [[tool.mypy.overrides]]
 module = "custom_components.byd_vehicle.config_flow"
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true
