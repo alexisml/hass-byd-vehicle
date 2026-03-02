@@ -90,9 +90,7 @@ async def test_async_setup_entry_multi_vehicle_creates_coordinators() -> None:
     ), patch("custom_components.byd_vehicle.BydApi") as MockBydApi:
         mock_api_instance = MagicMock()
         mock_api_instance.register_coordinators = MagicMock()
-        mock_api_instance.async_call = AsyncMock(
-            return_value=[vehicle_a, vehicle_b]
-        )
+        mock_api_instance.async_call = AsyncMock(return_value=[vehicle_a, vehicle_b])
         MockBydApi.return_value = mock_api_instance
 
         with patch(

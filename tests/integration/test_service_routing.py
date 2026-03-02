@@ -94,7 +94,7 @@ def test_get_coordinators_gps_none_when_not_present() -> None:
 
 @pytest.mark.asyncio
 async def test_service_fetch_realtime_reaches_coordinator() -> None:
-    """Registered fetch_realtime service handler calls coordinator.async_fetch_realtime."""
+    """fetch_realtime service handler calls coordinator.async_fetch_realtime."""
     vin = "VIN_SVC_004"
     entry_id = "entry_svc_4"
 
