@@ -53,6 +53,21 @@ class TestNormalizeEpoch:
     def test_zero_returns_none(self) -> None:
         assert _normalize_epoch(0) is None
 
+    def test_epoch_zero_datetime_returns_none(self) -> None:
+        """A datetime exactly at Unix epoch (timestamp==0) is an API sentinel."""
+        dt = datetime(1970, 1, 1, tzinfo=UTC)
+        assert _normalize_epoch(dt) is None
+
+    def test_pre_epoch_datetime_returns_none(self) -> None:
+        """A datetime before Unix epoch (timestamp<0) is an API sentinel."""
+        dt = datetime(1969, 12, 31, 23, 59, 59, tzinfo=UTC)
+        assert _normalize_epoch(dt) is None
+
+    def test_naive_epoch_zero_datetime_returns_none(self) -> None:
+        """A naive datetime at epoch 0 is also an API sentinel."""
+        dt = datetime(1970, 1, 1)
+        assert _normalize_epoch(dt) is None
+
     def test_non_numeric_string_returns_none(self) -> None:
         assert _normalize_epoch("bad") is None
 
@@ -93,6 +108,7 @@ def _make_sensor(
     attr_key: str | None = None,
     value_fn=None,
     validator_fn=None,
+    sentinel_minus_one: bool = False,
 ) -> BydSensor:
     """Create a BydSensor without a running HA instance."""
     vin = "TESTVIN123"
@@ -102,6 +118,7 @@ def _make_sensor(
         attr_key=attr_key,
         value_fn=value_fn,
         validator_fn=validator_fn,
+        sentinel_minus_one=sentinel_minus_one,
     )
     coordinator = MagicMock()
     coordinator.last_update_success = True
@@ -315,3 +332,54 @@ def test_normalize_epoch_overflow_returns_none() -> None:
     # A huge integer will cause OverflowError in datetime.fromtimestamp
     result = _normalize_epoch(2**63)
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# API sentinel -1 handling in _resolve_validated_value
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_validated_value_minus_one_returns_none_when_flag_set() -> None:
+    """Numeric -1 is treated as 'not available' when sentinel_minus_one=True."""
+    rt = types.SimpleNamespace(oil_percent=-1)
+    sensor = _make_sensor(
+        data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
+        attr_key="oil_percent",
+        sentinel_minus_one=True,
+    )
+    assert sensor._resolve_validated_value() is None
+
+
+def test_resolve_validated_value_minus_one_float_returns_none_when_flag_set() -> None:
+    """Numeric -1.0 (float) is treated as 'not available' when sentinel_minus_one=True."""
+    rt = types.SimpleNamespace(oil_endurance=-1.0)
+    sensor = _make_sensor(
+        data={
+            "realtime": {"TESTVIN123": rt},
+            "vehicles": {"TESTVIN123": MagicMock()},
+        },
+        attr_key="oil_endurance",
+        sentinel_minus_one=True,
+    )
+    assert sensor._resolve_validated_value() is None
+
+
+def test_resolve_validated_value_minus_one_passes_through_without_flag() -> None:
+    """-1 is NOT filtered when sentinel_minus_one is False (default)."""
+    rt = types.SimpleNamespace(temp_in_car=-1)
+    sensor = _make_sensor(
+        data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
+        attr_key="temp_in_car",
+    )
+    assert sensor._resolve_validated_value() == -1
+
+
+def test_resolve_validated_value_minus_one_does_not_affect_valid_values() -> None:
+    """Values other than -1 are passed through normally even with flag set."""
+    rt = types.SimpleNamespace(oil_percent=50)
+    sensor = _make_sensor(
+        data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
+        attr_key="oil_percent",
+        sentinel_minus_one=True,
+    )
+    assert sensor._resolve_validated_value() == 50
