@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import types
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock as _AsyncMock, MagicMock, patch
 
+import pytest
 from homeassistant.components.climate.const import HVACMode
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from pybyd.models.hvac import HvacOverallStatus, HvacStatus
@@ -83,8 +84,6 @@ def _make_climate(realtime=None, hvac=None) -> BydClimate:
     entity.coordinator = coordinator
     entity._vin = vin
     entity._vehicle = MagicMock()
-    from unittest.mock import AsyncMock as _AsyncMock
-
     entity._api = MagicMock()
     entity._api.async_call = _AsyncMock()
     entity._attr_unique_id = f"{vin}_climate"
@@ -302,9 +301,6 @@ class TestExtraStateAttributes:
 # ---------------------------------------------------------------------------
 # Async methods
 # ---------------------------------------------------------------------------
-
-
-import pytest
 
 
 @pytest.mark.asyncio

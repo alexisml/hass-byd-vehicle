@@ -5,6 +5,7 @@ from __future__ import annotations
 import types
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from pybyd.models.hvac import HvacOverallStatus, HvacStatus
 from pybyd.models.realtime import StearingWheelHeat
@@ -410,8 +411,6 @@ def test_disable_polling_apply_disables_coordinator() -> None:
 # ---------------------------------------------------------------------------
 # BydBatteryHeatSwitch async methods
 # ---------------------------------------------------------------------------
-
-import pytest
 
 
 @pytest.mark.asyncio

@@ -5,6 +5,7 @@ from __future__ import annotations
 import types
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.byd_vehicle import lock
@@ -156,9 +157,6 @@ def test_extra_state_attributes_no_last_command() -> None:
 # ---------------------------------------------------------------------------
 # async_lock and async_unlock
 # ---------------------------------------------------------------------------
-
-
-import pytest
 
 
 @pytest.mark.asyncio

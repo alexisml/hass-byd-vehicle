@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from pybyd.models.realtime import SeatHeatVentState
 
@@ -155,9 +156,6 @@ def test_handle_coordinator_update_keeps_pending_when_not_confirmed() -> None:
     with patch.object(CoordinatorEntity, "_handle_coordinator_update"):
         entity._handle_coordinator_update()
     assert entity._pending_value == "high"
-
-
-import pytest
 
 
 def test_current_option_command_pending_no_pending_value() -> None:

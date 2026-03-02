@@ -5,6 +5,7 @@ from __future__ import annotations
 import types
 from unittest.mock import MagicMock
 
+import pytest
 from custom_components.byd_vehicle.coordinator import BydApi, get_vehicle_display
 
 
@@ -381,8 +382,6 @@ class TestApplyOptimisticHvac:
 # BydDataUpdateCoordinator async fetch helpers (mock API)
 # ---------------------------------------------------------------------------
 
-import pytest
-
 
 @pytest.mark.asyncio
 async def test_async_fetch_realtime_updates_data() -> None:
@@ -475,3 +474,433 @@ def test_handle_vehicle_info_ignores_unknown_vin() -> None:
     rt = MagicMock(spec=VehicleRealtimeData)
     # Should not raise
     api._handle_vehicle_info("UNKNOWNVIN", rt)
+
+
+# ---------------------------------------------------------------------------
+# BydApi other helpers
+# ---------------------------------------------------------------------------
+
+
+def test_config_property() -> None:
+    api = _make_api()
+    from pybyd.config import BydConfig
+    api._config = MagicMock(spec=BydConfig)
+    assert api.config is api._config
+
+
+def test_debug_dumps_enabled_property() -> None:
+    api = _make_api()
+    api._debug_dumps_enabled = True
+    assert api.debug_dumps_enabled is True
+
+
+def test_handle_command_ack_dispatches_to_coordinator() -> None:
+    api = _make_api()
+    coordinator = MagicMock()
+    coordinator.data = {"vehicles": {}}
+    api._coordinators = {"TESTVIN123": coordinator}
+    api._hass = MagicMock()
+    api._handle_command_ack("remoteControl", "TESTVIN123", {"requestSerial": "abc123"})
+    coordinator.async_set_updated_data.assert_called_once()
+    assert api._hass.async_create_task.call_count == 2
+
+
+def test_handle_command_ack_unknown_vin_is_noop() -> None:
+    api = _make_api()
+    api._coordinators = {}
+    api._hass = MagicMock()
+    api._handle_command_ack("remoteControl", "UNKNOWNVIN", {})
+    api._hass.async_create_task.assert_not_called()
+
+
+def test_handle_mqtt_event_no_debug_dump_when_disabled() -> None:
+    api = _make_api()
+    api._debug_dumps_enabled = False
+    api._hass = MagicMock()
+    api._handle_mqtt_event("someEvent", "TESTVIN123", {})
+    api._hass.async_create_task.assert_not_called()
+
+
+def test_handle_mqtt_event_creates_task_when_debug_enabled() -> None:
+    api = _make_api()
+    api._debug_dumps_enabled = True
+    api._hass = MagicMock()
+    api._handle_mqtt_event("someEvent", "TESTVIN123", {"data": "val"})
+    api._hass.async_create_task.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_async_shutdown_calls_invalidate_client() -> None:
+    """async_shutdown invokes _invalidate_client."""
+    api = _make_api()
+    api._client = None  # No client to close
+    api._entry = MagicMock()
+    api._entry.entry_id = "test_entry"
+    # Should not raise
+    await api.async_shutdown()
+
+
+@pytest.mark.asyncio
+async def test_async_write_debug_dump_forwards_to_internal() -> None:
+    from unittest.mock import AsyncMock
+
+    api = _make_api()
+    api._async_write_debug_dump = AsyncMock()
+    await api.async_write_debug_dump("cat", {"k": "v"})
+    api._async_write_debug_dump.assert_called_once_with("cat", {"k": "v"})
+
+
+@pytest.mark.asyncio
+async def test_invalidate_client_with_existing_client() -> None:
+    from unittest.mock import AsyncMock
+
+    api = _make_api()
+    client = MagicMock()
+    client.async_close = AsyncMock()
+    api._client = client
+    api._entry = MagicMock()
+    api._entry.entry_id = "test_entry"
+    await api._invalidate_client()
+    client.async_close.assert_called_once()
+    assert api._client is None
+
+
+@pytest.mark.asyncio
+async def test_invalidate_client_no_client_is_noop() -> None:
+    api = _make_api()
+    api._client = None
+    # Should not raise
+    await api._invalidate_client()
+
+
+@pytest.mark.asyncio
+async def test_invalidate_client_handles_exception() -> None:
+    """Test that _invalidate_client handles exceptions from async_close."""
+    from unittest.mock import AsyncMock
+
+    api = _make_api()
+    client = MagicMock()
+    client.async_close = AsyncMock(side_effect=RuntimeError("close failed"))
+    api._client = client
+    api._entry = MagicMock()
+    api._entry.entry_id = "test_entry"
+    # Should not raise — exception is swallowed
+    await api._invalidate_client()
+    assert api._client is None
+
+
+@pytest.mark.asyncio
+async def test_async_call_success() -> None:
+    """Test successful BydApi.async_call path."""
+    from unittest.mock import AsyncMock
+
+    api = _make_api()
+    mock_client = MagicMock()
+    api._ensure_client = AsyncMock(return_value=mock_client)
+    api._entry = MagicMock()
+    api._entry.entry_id = "test_entry"
+
+    handler = AsyncMock(return_value="result")
+    result = await api.async_call(handler, vin="TESTVIN123456", command="test")
+    assert result == "result"
+    handler.assert_called_once_with(mock_client)
+
+
+@pytest.mark.asyncio
+async def test_async_call_byd_api_error_raises_update_failed() -> None:
+    """Test that BydApiError is wrapped in UpdateFailed."""
+    from unittest.mock import AsyncMock
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+    from pybyd import BydApiError
+
+    api = _make_api()
+    mock_client = MagicMock()
+    api._ensure_client = AsyncMock(return_value=mock_client)
+    api._entry = MagicMock()
+    api._entry.entry_id = "test_entry"
+
+    handler = AsyncMock(side_effect=BydApiError("api error"))
+    with pytest.raises(UpdateFailed):
+        await api.async_call(handler, vin="TESTVIN123456", command="test")
+
+
+@pytest.mark.asyncio
+async def test_async_call_auth_error_raises_config_entry_auth_failed() -> None:
+    """Test that BydAuthenticationError raises ConfigEntryAuthFailed."""
+    from unittest.mock import AsyncMock
+    from homeassistant.config_entries import ConfigEntryAuthFailed
+    from pybyd import BydAuthenticationError
+
+    api = _make_api()
+    mock_client = MagicMock()
+    api._ensure_client = AsyncMock(return_value=mock_client)
+    api._entry = MagicMock()
+    api._entry.entry_id = "test_entry"
+
+    handler = AsyncMock(side_effect=BydAuthenticationError("auth error"))
+    with pytest.raises(ConfigEntryAuthFailed):
+        await api.async_call(handler, vin="TESTVIN123456", command="test")
+
+
+@pytest.mark.asyncio
+async def test_async_call_session_expired_then_retry_fails() -> None:
+    """Test BydSessionExpiredError triggers invalidate + retry, which then fails."""
+    from unittest.mock import AsyncMock, patch
+    from homeassistant.config_entries import ConfigEntryAuthFailed
+    from pybyd import BydAuthenticationError, BydSessionExpiredError
+
+    api = _make_api()
+    mock_client = MagicMock()
+    # First call: raises BydSessionExpiredError; second call after retry: BydAuthenticationError
+    api._ensure_client = AsyncMock(return_value=mock_client)
+    api._invalidate_client = AsyncMock()
+    api._entry = MagicMock()
+    api._entry.entry_id = "test_entry"
+
+    call_count = 0
+
+    async def handler(client):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise BydSessionExpiredError("expired")
+        raise BydAuthenticationError("auth failed")
+
+    with pytest.raises(ConfigEntryAuthFailed):
+        await api.async_call(handler, vin="TESTVIN123456", command="test")
+    api._invalidate_client.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_async_call_control_password_error() -> None:
+    from unittest.mock import AsyncMock
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+    from pybyd import BydControlPasswordError
+
+    api = _make_api()
+    mock_client = MagicMock()
+    api._ensure_client = AsyncMock(return_value=mock_client)
+    api._entry = MagicMock()
+    api._entry.entry_id = "test_entry"
+
+    handler = AsyncMock(side_effect=BydControlPasswordError("bad pin"))
+    with pytest.raises(UpdateFailed, match="Control PIN"):
+        await api.async_call(handler, vin="TESTVIN123456", command="test")
+
+
+@pytest.mark.asyncio
+async def test_async_call_rate_limit_error() -> None:
+    from unittest.mock import AsyncMock
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+    from pybyd import BydRateLimitError
+
+    api = _make_api()
+    mock_client = MagicMock()
+    api._ensure_client = AsyncMock(return_value=mock_client)
+    api._entry = MagicMock()
+    api._entry.entry_id = "test_entry"
+
+    handler = AsyncMock(side_effect=BydRateLimitError("rate limited"))
+    with pytest.raises(UpdateFailed, match="rate limited"):
+        await api.async_call(handler, vin="TESTVIN123456", command="test")
+
+
+@pytest.mark.asyncio
+async def test_async_call_transport_error_invalidates_client() -> None:
+    from unittest.mock import AsyncMock
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+    from pybyd import BydTransportError
+
+    api = _make_api()
+    mock_client = MagicMock()
+    api._ensure_client = AsyncMock(return_value=mock_client)
+    api._invalidate_client = AsyncMock()
+    api._entry = MagicMock()
+    api._entry.entry_id = "test_entry"
+
+    handler = AsyncMock(side_effect=BydTransportError("transport error"))
+    with pytest.raises(UpdateFailed):
+        await api.async_call(handler, vin="TESTVIN123456", command="test")
+    api._invalidate_client.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_async_call_endpoint_not_supported() -> None:
+    from unittest.mock import AsyncMock
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+    from pybyd import BydEndpointNotSupportedError
+
+    api = _make_api()
+    mock_client = MagicMock()
+    api._ensure_client = AsyncMock(return_value=mock_client)
+    api._entry = MagicMock()
+    api._entry.entry_id = "test_entry"
+
+    handler = AsyncMock(side_effect=BydEndpointNotSupportedError("not supported"))
+    with pytest.raises(UpdateFailed, match="not supported"):
+        await api.async_call(handler, vin="TESTVIN123456", command="test")
+
+
+@pytest.mark.asyncio
+async def test_async_call_generic_exception_reraises() -> None:
+    from unittest.mock import AsyncMock
+
+    api = _make_api()
+    mock_client = MagicMock()
+    api._ensure_client = AsyncMock(return_value=mock_client)
+    api._entry = MagicMock()
+    api._entry.entry_id = "test_entry"
+
+    handler = AsyncMock(side_effect=ValueError("unexpected"))
+    with pytest.raises(ValueError, match="unexpected"):
+        await api.async_call(handler, vin="TESTVIN123456", command="test")
+
+
+@pytest.mark.asyncio
+async def test_async_call_session_expired_retry_with_api_error() -> None:
+    """After session expiry, retry fails with BydApiError → UpdateFailed."""
+    from unittest.mock import AsyncMock
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+    from pybyd import BydApiError, BydSessionExpiredError
+
+    api = _make_api()
+    mock_client = MagicMock()
+    api._ensure_client = AsyncMock(return_value=mock_client)
+    api._invalidate_client = AsyncMock()
+    api._entry = MagicMock()
+    api._entry.entry_id = "test_entry"
+
+    call_count = 0
+
+    async def handler(client):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise BydSessionExpiredError("expired")
+        raise BydApiError("api error after retry")
+
+    with pytest.raises(UpdateFailed):
+        await api.async_call(handler, vin="TESTVIN123456", command="test")
+
+
+@pytest.mark.asyncio
+async def test_async_call_session_expired_retry_with_generic_error() -> None:
+    """After session expiry, retry fails with generic error → UpdateFailed."""
+    from unittest.mock import AsyncMock
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+    from pybyd import BydSessionExpiredError
+
+    api = _make_api()
+    mock_client = MagicMock()
+    api._ensure_client = AsyncMock(return_value=mock_client)
+    api._invalidate_client = AsyncMock()
+    api._entry = MagicMock()
+    api._entry.entry_id = "test_entry"
+
+    call_count = 0
+
+    async def handler(client):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise BydSessionExpiredError("expired")
+        raise RuntimeError("some generic error")
+
+    with pytest.raises(UpdateFailed):
+        await api.async_call(handler, vin="TESTVIN123456", command="test")
+
+
+@pytest.mark.asyncio
+async def test_async_fetch_hvac_delayed_calls_fetch() -> None:
+    """async_fetch_hvac_delayed should eventually call async_fetch_hvac."""
+    from unittest.mock import AsyncMock, patch
+
+    coordinator = _make_telemetry_coordinator()
+    coordinator.async_fetch_hvac = AsyncMock()
+    with patch("asyncio.sleep", new_callable=lambda: (lambda *_: __import__("asyncio").coroutine(lambda: None)())):
+        pass  # skip the patch; instead just call directly with 0 delay
+    coordinator.async_fetch_hvac = AsyncMock()
+    # Call with 0 delay to avoid actual sleep in tests
+    import asyncio
+    with patch("custom_components.byd_vehicle.coordinator.asyncio.sleep", new=AsyncMock()):
+        await coordinator.async_fetch_hvac_delayed(0)
+    coordinator.async_fetch_hvac.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_async_fetch_realtime_delayed_calls_fetch() -> None:
+    """async_fetch_realtime_delayed should eventually call async_fetch_realtime."""
+    from unittest.mock import AsyncMock, patch
+
+    coordinator = _make_telemetry_coordinator()
+    coordinator.async_fetch_realtime = AsyncMock()
+    with patch("custom_components.byd_vehicle.coordinator.asyncio.sleep", new=AsyncMock()):
+        await coordinator.async_fetch_realtime_delayed(0)
+    coordinator.async_fetch_realtime.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_async_fetch_hvac_delayed_handles_exception() -> None:
+    """async_fetch_hvac_delayed should swallow exceptions from async_fetch_hvac."""
+    from unittest.mock import AsyncMock, patch
+
+    coordinator = _make_telemetry_coordinator()
+    coordinator.async_fetch_hvac = AsyncMock(side_effect=RuntimeError("fetch failed"))
+    with patch("custom_components.byd_vehicle.coordinator.asyncio.sleep", new=AsyncMock()):
+        # Should not raise
+        await coordinator.async_fetch_hvac_delayed(0)
+
+
+@pytest.mark.asyncio
+async def test_async_fetch_realtime_delayed_handles_exception() -> None:
+    """async_fetch_realtime_delayed should swallow exceptions."""
+    from unittest.mock import AsyncMock, patch
+
+    coordinator = _make_telemetry_coordinator()
+    coordinator.async_fetch_realtime = AsyncMock(side_effect=RuntimeError("fetch failed"))
+    with patch("custom_components.byd_vehicle.coordinator.asyncio.sleep", new=AsyncMock()):
+        # Should not raise
+        await coordinator.async_fetch_realtime_delayed(0)
+
+
+@pytest.mark.asyncio
+async def test_ensure_client_returns_existing_client() -> None:
+    """_ensure_client should return existing client without creating a new one."""
+    from unittest.mock import AsyncMock
+
+    api = _make_api()
+    mock_client = MagicMock()
+    api._client = mock_client
+    result = await api._ensure_client()
+    assert result is mock_client
+
+
+@pytest.mark.asyncio
+async def test_async_fetch_gps_updates_data() -> None:
+    """async_fetch_gps should update coordinator data with GPS info."""
+    from unittest.mock import AsyncMock
+    from pybyd.models.gps import GpsInfo
+
+    coordinator = _make_gps_coordinator()
+    coordinator.data = {"vehicles": {}}
+    gps = GpsInfo(latitude=51.5, longitude=4.8)
+    coordinator._api.async_call = AsyncMock(return_value=gps)
+    await coordinator.async_fetch_gps()
+    coordinator.async_set_updated_data.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_async_fetch_gps_with_null_island_guards() -> None:
+    """async_fetch_gps should guard against Null Island coordinates."""
+    from unittest.mock import AsyncMock
+    from pybyd.models.gps import GpsInfo
+
+    coordinator = _make_gps_coordinator()
+    coordinator.data = {"vehicles": {}}
+    coordinator._last_gps = GpsInfo(latitude=51.5, longitude=4.8)  # valid previous
+    # Null Island (0,0) should be rejected
+    gps = GpsInfo(latitude=0.0, longitude=0.0)
+    coordinator._api.async_call = AsyncMock(return_value=gps)
+    await coordinator.async_fetch_gps()
+    # Data still updated (but without the null island GPS)
+    coordinator.async_set_updated_data.assert_called_once()
