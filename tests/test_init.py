@@ -295,7 +295,6 @@ async def test_async_reload_entry() -> None:
 async def test_service_fetch_realtime_handler_invokes_coordinator() -> None:
     """Cover lines 259-261: _handle_fetch_realtime body."""
 
-
     hass = _make_hass_for_services(already_registered=False)
     # Capture registered handlers
     captured = {}
@@ -326,7 +325,6 @@ async def test_service_fetch_realtime_handler_invokes_coordinator() -> None:
 async def test_service_fetch_gps_handler_invokes_gps_coordinator() -> None:
     """Cover lines 264-267: _handle_fetch_gps body."""
 
-
     hass = _make_hass_for_services(already_registered=False)
     captured = {}
 
@@ -356,7 +354,6 @@ async def test_service_fetch_gps_handler_invokes_gps_coordinator() -> None:
 async def test_service_fetch_gps_handler_skips_when_gps_none() -> None:
     """Cover line 266: if gps is not None branch when gps is None."""
 
-
     hass = _make_hass_for_services(already_registered=False)
     captured = {}
 
@@ -382,7 +379,6 @@ async def test_service_fetch_gps_handler_skips_when_gps_none() -> None:
 @pytest.mark.asyncio
 async def test_service_fetch_hvac_handler_invokes_coordinator() -> None:
     """Cover lines 270-272: _handle_fetch_hvac body."""
-
 
     hass = _make_hass_for_services(already_registered=False)
     captured = {}
@@ -439,9 +435,7 @@ async def test_async_setup_entry_no_vehicles_raises() -> None:
     with patch(
         "custom_components.byd_vehicle.async_get_clientsession",
         return_value=MagicMock(),
-    ), patch(
-        "custom_components.byd_vehicle.BydApi"
-    ) as mock_api_class:
+    ), patch("custom_components.byd_vehicle.BydApi") as mock_api_class:
         mock_api = mock_api_class.return_value
         mock_api.async_call = AsyncMock(return_value=[])  # no vehicles
 

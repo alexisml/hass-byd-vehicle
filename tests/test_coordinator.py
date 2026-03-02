@@ -85,7 +85,6 @@ def test_write_debug_dump_handles_exception_gracefully() -> None:
 # ---------------------------------------------------------------------------
 
 
-
 def _make_telemetry_coordinator() -> BydDataUpdateCoordinator:
     """Create a BydDataUpdateCoordinator bypassing __init__."""
 
@@ -481,6 +480,7 @@ def test_handle_vehicle_info_ignores_unknown_vin() -> None:
 def test_config_property() -> None:
     api = _make_api()
     from pybyd.config import BydConfig
+
     api._config = MagicMock(spec=BydConfig)
     assert api.config is api._config
 

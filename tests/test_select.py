@@ -181,6 +181,7 @@ async def test_async_select_option_valid() -> None:
     entity = _make_select()
     entity._api = MagicMock()
     from unittest.mock import AsyncMock
+
     entity._api.async_call = AsyncMock()
     await entity.async_select_option("low")
     assert entity._pending_value == "low"
@@ -193,6 +194,7 @@ async def test_async_select_option_invalid_ignores() -> None:
     entity = _make_select()
     entity._api = MagicMock()
     from unittest.mock import AsyncMock
+
     entity._api.async_call = AsyncMock()
     await entity.async_select_option("invalid_option")
     assert entity._pending_value is None

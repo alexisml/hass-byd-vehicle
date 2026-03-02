@@ -147,9 +147,7 @@ async def test_force_poll_press_calls_gps_refresh_if_present() -> None:
 @pytest.mark.asyncio
 async def test_force_poll_press_raises_on_error() -> None:
     entity = _make_force_poll_button()
-    entity.coordinator.async_force_refresh = AsyncMock(
-        side_effect=RuntimeError("fail")
-    )
+    entity.coordinator.async_force_refresh = AsyncMock(side_effect=RuntimeError("fail"))
     with pytest.raises(HomeAssistantError):
         await entity.async_press()
 
