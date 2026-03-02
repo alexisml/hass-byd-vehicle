@@ -1,11 +1,19 @@
-"""Unit tests for sensor pure helpers."""
+"""Unit tests for sensor module."""
 
 from __future__ import annotations
 
 import types
 from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
 
-from custom_components.byd_vehicle.sensor import _normalize_epoch, _round_int_attr
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from custom_components.byd_vehicle.sensor import (
+    BydSensor,
+    BydSensorDescription,
+    _normalize_epoch,
+    _round_int_attr,
+)
 
 
 class TestNormalizeEpoch:
@@ -71,3 +79,153 @@ class TestRoundIntAttr:
         fn = _round_int_attr("val")
         obj = types.SimpleNamespace(val=3)
         assert fn(obj) == 3
+
+
+# ---------------------------------------------------------------------------
+# BydSensor entity tests (bypass __init__ with object.__new__)
+# ---------------------------------------------------------------------------
+
+
+def _make_sensor(
+    data: dict | None = None,
+    key: str = "test_sensor",
+    source: str = "realtime",
+    attr_key: str | None = None,
+    value_fn=None,
+    validator_fn=None,
+) -> BydSensor:
+    """Create a BydSensor without a running HA instance."""
+    vin = "TESTVIN123"
+    desc = BydSensorDescription(
+        key=key,
+        source=source,
+        attr_key=attr_key,
+        value_fn=value_fn,
+        validator_fn=validator_fn,
+    )
+    coordinator = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.data = data or {"vehicles": {vin: MagicMock()}}
+
+    sensor = object.__new__(BydSensor)
+    sensor.coordinator = coordinator
+    sensor._vin = vin
+    sensor._vehicle = MagicMock()
+    sensor.entity_description = desc
+    sensor._attr_unique_id = f"{vin}_{source}_{key}"
+    sensor._last_native_value = None
+    sensor._command_pending = False
+    sensor._commanded_at = None
+    sensor.async_write_ha_state = MagicMock()
+    return sensor
+
+
+def test_resolve_value_with_value_fn() -> None:
+    rt = types.SimpleNamespace(speed=120)
+    sensor = _make_sensor(
+        data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
+        value_fn=lambda o: o.speed,
+    )
+    assert sensor._resolve_value() == 120
+
+
+def test_resolve_value_with_attr_key() -> None:
+    rt = types.SimpleNamespace(battery_level=80)
+    sensor = _make_sensor(
+        data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
+        attr_key="battery_level",
+    )
+    assert sensor._resolve_value() == 80
+
+
+def test_resolve_value_returns_none_when_no_source_obj() -> None:
+    sensor = _make_sensor(data={"vehicles": {"TESTVIN123": MagicMock()}})
+    assert sensor._resolve_value() is None
+
+
+def test_resolve_value_last_updated_with_timestamp() -> None:
+    ts = datetime(2024, 1, 1, tzinfo=UTC)
+    rt = types.SimpleNamespace(timestamp=ts)
+    sensor = _make_sensor(
+        data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
+        key="last_updated",
+    )
+    result = sensor._resolve_value()
+    assert isinstance(result, datetime)
+
+
+def test_resolve_value_last_updated_no_realtime() -> None:
+    sensor = _make_sensor(
+        data={"vehicles": {"TESTVIN123": MagicMock()}},
+        key="last_updated",
+    )
+    assert sensor._resolve_value() is None
+
+
+def test_resolve_value_gps_last_updated() -> None:
+    gps = types.SimpleNamespace(gps_timestamp=None)
+    sensor = _make_sensor(
+        data={
+            "gps": {"TESTVIN123": gps},
+            "vehicles": {"TESTVIN123": MagicMock()},
+        },
+        key="gps_last_updated",
+    )
+    assert sensor._resolve_value() is None
+
+
+def test_resolve_value_enum_attr_returns_value() -> None:
+    """Test that enum values with .value attribute are unwrapped."""
+    enum_like = types.SimpleNamespace(value=3)
+    rt = types.SimpleNamespace(charge_state=enum_like)
+    sensor = _make_sensor(
+        data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
+        attr_key="charge_state",
+    )
+    assert sensor._resolve_value() == 3
+
+
+def test_resolve_validated_value_applies_validator() -> None:
+    rt = types.SimpleNamespace(battery_level=80)
+    calls = []
+
+    def validator(prev, val):
+        calls.append((prev, val))
+        return val
+
+    sensor = _make_sensor(
+        data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
+        attr_key="battery_level",
+        validator_fn=validator,
+    )
+    result = sensor._resolve_validated_value()
+    assert result == 80
+    assert len(calls) == 1
+    assert sensor._last_native_value == 80
+
+
+def test_native_value_returns_resolved() -> None:
+    rt = types.SimpleNamespace(battery_level=75)
+    sensor = _make_sensor(
+        data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
+        attr_key="battery_level",
+    )
+    assert sensor.native_value == 75
+
+
+def test_available_false_when_no_source_obj() -> None:
+    sensor = _make_sensor(data={"vehicles": {"TESTVIN123": MagicMock()}})
+    prop = property(lambda self: True)
+    with patch.object(CoordinatorEntity, "available", new_callable=lambda: prop):
+        assert sensor.available is False
+
+
+def test_available_true_when_source_obj_present() -> None:
+    rt = types.SimpleNamespace(battery_level=75)
+    sensor = _make_sensor(
+        data={"realtime": {"TESTVIN123": rt}, "vehicles": {"TESTVIN123": MagicMock()}},
+        attr_key="battery_level",
+    )
+    prop = property(lambda self: True)
+    with patch.object(CoordinatorEntity, "available", new_callable=lambda: prop):
+        assert sensor.available is True
