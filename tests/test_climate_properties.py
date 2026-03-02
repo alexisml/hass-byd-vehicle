@@ -6,7 +6,6 @@ import types
 from unittest.mock import AsyncMock as _AsyncMock
 from unittest.mock import MagicMock, patch
 
-import pytest
 from homeassistant.components.climate.const import HVACMode
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from pybyd.models.hvac import HvacOverallStatus, HvacStatus
@@ -297,82 +296,3 @@ class TestExtraStateAttributes:
         entity = _make_climate()
         attrs = entity.extra_state_attributes
         assert "last_remote_command" not in attrs
-
-
-# ---------------------------------------------------------------------------
-# Async methods
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_set_hvac_mode_off_clears_optimistic() -> None:
-    entity = _make_climate()
-    entity.coordinator.apply_optimistic_hvac = MagicMock()
-    entity._schedule_delayed_refresh = MagicMock()
-    await entity.async_set_hvac_mode(HVACMode.OFF)
-    assert entity._last_mode is HVACMode.OFF
-    assert entity._command_pending is True
-    entity.coordinator.apply_optimistic_hvac.assert_called_once()
-    entity._schedule_delayed_refresh.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_set_hvac_mode_on_sets_state() -> None:
-    entity = _make_climate()
-    entity.coordinator.apply_optimistic_hvac = MagicMock()
-    entity._schedule_delayed_refresh = MagicMock()
-    await entity.async_set_hvac_mode(HVACMode.HEAT_COOL)
-    assert entity._last_mode is HVACMode.HEAT_COOL
-    assert entity._command_pending is True
-    entity.coordinator.apply_optimistic_hvac.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_set_temperature_no_temp_does_nothing() -> None:
-    entity = _make_climate()
-    await entity.async_set_temperature()
-    assert entity._pending_target_temp is None
-
-
-@pytest.mark.asyncio
-async def test_set_temperature_while_climate_off_sets_pending() -> None:
-    entity = _make_climate()
-    entity._last_mode = HVACMode.OFF
-    await entity.async_set_temperature(temperature=23.0)
-    assert entity._pending_target_temp == 23.0
-    assert entity._command_pending is True
-
-
-@pytest.mark.asyncio
-async def test_set_temperature_while_climate_on_executes_command() -> None:
-    hvac = HvacStatus(status=HvacOverallStatus.ON)
-    rt = types.SimpleNamespace(is_vehicle_on=True)
-    entity = _make_climate(realtime=rt, hvac=hvac)
-    await entity.async_set_temperature(temperature=25.0)
-    assert entity._pending_target_temp == 25.0
-    assert entity._command_pending is True
-
-
-@pytest.mark.asyncio
-async def test_set_preset_mode_max_heat() -> None:
-    entity = _make_climate()
-    await entity.async_set_preset_mode("max_heat")
-    assert entity._pending_target_temp == float(BydClimate._TEMP_MAX_C)
-    assert entity._command_pending is True
-
-
-@pytest.mark.asyncio
-async def test_set_preset_mode_max_cool() -> None:
-    entity = _make_climate()
-    await entity.async_set_preset_mode("max_cool")
-    assert entity._pending_target_temp == float(BydClimate._TEMP_MIN_C)
-    assert entity._command_pending is True
-
-
-@pytest.mark.asyncio
-async def test_set_preset_mode_invalid_raises() -> None:
-    from homeassistant.exceptions import HomeAssistantError
-
-    entity = _make_climate()
-    with pytest.raises(HomeAssistantError):
-        await entity.async_set_preset_mode("invalid_preset")

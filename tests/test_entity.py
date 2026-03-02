@@ -108,6 +108,14 @@ def test_available_false_when_vin_missing() -> None:
         assert entity.available is False
 
 
+def test_available_false_when_super_unavailable() -> None:
+    """Cover entity.py line 59: return False when super().available is False."""
+    entity = _make_entity({"vehicles": {"TESTVIN1234567": MagicMock()}})
+    prop = property(lambda self: False)
+    with patch.object(CoordinatorEntity, "available", new_callable=lambda: prop):
+        assert entity.available is False
+
+
 # ---------------------------------------------------------------------------
 # Data helpers
 # ---------------------------------------------------------------------------

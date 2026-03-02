@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import re
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from custom_components.byd_vehicle.device_fingerprint import (
     _generate_imei,
     _generate_mac,
     _luhn_check_digit,
+    async_generate_device_profile,
     generate_device_profile,
 )
 
@@ -99,3 +103,13 @@ def test_generate_device_profile_imei_md5() -> None:
     profile = generate_device_profile()
     expected_md5 = hashlib.md5(profile["imei"].encode()).hexdigest()
     assert profile["imei_md5"] == expected_md5
+
+
+@pytest.mark.asyncio
+async def test_async_generate_device_profile_returns_dict() -> None:
+    """Cover device_fingerprint.py line 99: async_generate_device_profile."""
+    hass = MagicMock()
+    hass.async_add_executor_job = AsyncMock(return_value={"imei": "123456789012345"})
+    result = await async_generate_device_profile(hass)
+    hass.async_add_executor_job.assert_called_once_with(generate_device_profile)
+    assert result == {"imei": "123456789012345"}

@@ -1,4 +1,4 @@
-"""Unit tests for sensor module."""
+"""Unit tests for sensor module helpers and entity properties."""
 
 from __future__ import annotations
 
@@ -82,7 +82,7 @@ class TestRoundIntAttr:
 
 
 # ---------------------------------------------------------------------------
-# BydSensor entity tests (bypass __init__ with object.__new__)
+# BydSensor entity helpers
 # ---------------------------------------------------------------------------
 
 

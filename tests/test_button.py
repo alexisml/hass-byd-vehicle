@@ -195,3 +195,121 @@ async def test_button_press_call_with_method_present_succeeds() -> None:
     entity._api.async_call = invoke_handler
     # Should not raise
     await entity.async_press()
+
+
+# ---------------------------------------------------------------------------
+# async_setup_entry (lines 60-76)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_button_async_setup_entry_no_vehicles() -> None:
+    """Cover lines 60-76: async_setup_entry skips when vehicle is None."""
+    from custom_components.byd_vehicle.button import async_setup_entry
+    from custom_components.byd_vehicle.const import DOMAIN
+
+    vin = "TESTVIN123"
+    coordinator = MagicMock()
+    coordinator.data = {"vehicles": {}}  # vehicle is None → skip
+
+    hass = MagicMock()
+    hass.data = {
+        DOMAIN: {
+            "entry1": {
+                "coordinators": {vin: coordinator},
+                "gps_coordinators": {},
+                "api": MagicMock(),
+            }
+        }
+    }
+    entry = MagicMock()
+    entry.entry_id = "entry1"
+    async_add_entities = MagicMock()
+
+    await async_setup_entry(hass, entry, async_add_entities)
+    async_add_entities.assert_called_once_with([])
+
+
+@pytest.mark.asyncio
+async def test_button_async_setup_entry_creates_entities() -> None:
+    """Cover lines 60-76: async_setup_entry creates BydButton + BydForcePollButton."""
+    from custom_components.byd_vehicle.button import async_setup_entry
+    from custom_components.byd_vehicle.const import DOMAIN
+
+    vin = "TESTVIN123"
+    vehicle_mock = MagicMock()
+    coordinator = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.data = {"vehicles": {vin: vehicle_mock}}
+
+    hass = MagicMock()
+    hass.data = {
+        DOMAIN: {
+            "entry1": {
+                "coordinators": {vin: coordinator},
+                "gps_coordinators": {},
+                "api": MagicMock(),
+            }
+        }
+    }
+    entry = MagicMock()
+    entry.entry_id = "entry1"
+    async_add_entities = MagicMock()
+
+    with patch.object(BydButton, "__init__", return_value=None), patch.object(
+        BydForcePollButton, "__init__", return_value=None
+    ):
+        await async_setup_entry(hass, entry, async_add_entities)
+
+    async_add_entities.assert_called_once()
+    entities = async_add_entities.call_args[0][0]
+    # 1 BydForcePollButton + N BydButton descriptions
+    assert len(entities) == 1 + len(BUTTON_DESCRIPTIONS)
+
+
+# ---------------------------------------------------------------------------
+# __init__ constructors (lines 94-100, 148-152)
+# ---------------------------------------------------------------------------
+
+
+def _fake_coordinator_init(self, coordinator, **_):
+    """Minimal stand-in for CoordinatorEntity.__init__."""
+    self.coordinator = coordinator
+
+
+def test_byd_button_init() -> None:
+    """Cover button.py lines 94-100: BydButton.__init__."""
+    from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+    desc = BUTTON_DESCRIPTIONS[0]
+    coordinator = MagicMock()
+    api = MagicMock()
+    vin = "TESTVIN123"
+    vehicle = MagicMock()
+
+    with patch.object(CoordinatorEntity, "__init__", new=_fake_coordinator_init):
+        btn = BydButton(coordinator, api, vin, vehicle, desc)
+
+    assert btn._api is api
+    assert btn._vin == vin
+    assert btn._vehicle is vehicle
+    assert btn.entity_description is desc
+    assert btn._attr_unique_id == f"{vin}_button_{desc.key}"
+
+
+def test_force_poll_button_init() -> None:
+    """Cover button.py lines 148-152: BydForcePollButton.__init__."""
+    from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+    coordinator = MagicMock()
+    gps_coordinator = MagicMock()
+    vin = "TESTVIN123"
+    vehicle = MagicMock()
+
+    with patch.object(CoordinatorEntity, "__init__", new=_fake_coordinator_init):
+        btn = BydForcePollButton(coordinator, gps_coordinator, vin, vehicle)
+
+    assert btn._vin == vin
+    assert btn._vehicle is vehicle
+    assert btn._gps_coordinator is gps_coordinator
+    assert btn._attr_unique_id == f"{vin}_button_force_poll"

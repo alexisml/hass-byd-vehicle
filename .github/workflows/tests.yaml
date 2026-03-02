@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      checks: write
+      pull-requests: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -21,4 +23,9 @@ jobs:
       - name: Install dependencies
         run: pip install pytest pytest-asyncio pytest-cov pybyd==0.0.51 homeassistant
       - name: Run tests
-        run: pytest tests/ -v --cov=custom_components/byd_vehicle --cov-fail-under=70
+        run: pytest tests/ -v --cov=custom_components/byd_vehicle --cov-fail-under=95 --junitxml=results/junit.xml
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2.22.0
+        if: always()
+        with:
+          files: results/junit.xml
