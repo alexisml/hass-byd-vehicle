@@ -21,4 +21,4 @@ jobs:
       - name: Install dependencies
         run: pip install pytest pytest-asyncio pytest-cov pybyd==0.0.51 homeassistant
       - name: Run tests
-        run: pytest tests/ -v --cov=custom_components/byd_vehicle --cov-fail-under=70
+        run: pytest tests/ -v --cov=custom_components/byd_vehicle --cov-fail-under=80

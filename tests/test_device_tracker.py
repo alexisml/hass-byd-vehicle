@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from homeassistant.components.device_tracker import SourceType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from pybyd.models.gps import GpsInfo
 
 from custom_components.byd_vehicle import device_tracker
+from custom_components.byd_vehicle.const import DOMAIN
 from custom_components.byd_vehicle.device_tracker import BydDeviceTracker
 
 
@@ -124,3 +126,59 @@ def test_available_false_when_super_not_available() -> None:
     prop = property(lambda self: False)
     with patch.object(BydVehicleEntity, "available", new_callable=lambda: prop):
         assert tracker.available is False
+
+
+# ---------------------------------------------------------------------------
+# async_setup_entry tests (lines 23-34)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_no_vehicles_creates_no_entities() -> None:
+    """Cover lines 23-34: async_setup_entry with empty gps_coordinators."""
+    from custom_components.byd_vehicle.device_tracker import async_setup_entry
+
+    vin = "TESTVIN123"
+    gps_coordinator = MagicMock()
+    gps_coordinator.data = {"vehicles": {}}  # vin not in vehicles → vehicle is None
+
+    hass = MagicMock()
+    hass.data = {DOMAIN: {"entry1": {"gps_coordinators": {vin: gps_coordinator}}}}
+
+    entry = MagicMock()
+    entry.entry_id = "entry1"
+
+    async_add_entities = MagicMock()
+    await async_setup_entry(hass, entry, async_add_entities)
+
+    async_add_entities.assert_called_once_with([])
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_creates_tracker_entity() -> None:
+    """Cover lines 23-34 including line 32: entity created when vehicle found."""
+    from custom_components.byd_vehicle.device_tracker import async_setup_entry
+
+    vin = "TESTVIN123"
+    vehicle_mock = MagicMock()
+    gps_coordinator = MagicMock()
+    gps_coordinator.data = {"vehicles": {vin: vehicle_mock}}
+
+    hass = MagicMock()
+    hass.data = {DOMAIN: {"entry1": {"gps_coordinators": {vin: gps_coordinator}}}}
+
+    entry = MagicMock()
+    entry.entry_id = "entry1"
+
+    async_add_entities = MagicMock()
+
+    with patch(
+        "custom_components.byd_vehicle.device_tracker.BydDeviceTracker.__init__",
+        return_value=None,
+    ):
+        await async_setup_entry(hass, entry, async_add_entities)
+
+    async_add_entities.assert_called_once()
+    entities = async_add_entities.call_args[0][0]
+    assert len(entities) == 1
+    assert isinstance(entities[0], BydDeviceTracker)

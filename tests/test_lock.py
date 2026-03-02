@@ -175,3 +175,103 @@ async def test_async_unlock_sets_last_command_and_pending() -> None:
     assert entity._last_command == "unlock"
     assert entity._last_locked is False
     assert entity._command_pending is True
+
+
+@pytest.mark.asyncio
+async def test_async_lock_executes_api_call() -> None:
+    """Cover lock.py line 103: the inner _call closure calls client.lock."""
+    entity = _make_lock()
+    client = AsyncMock()
+    client.lock = AsyncMock(return_value=None)
+
+    async def execute_call(func, **kwargs):  # **kwargs absorbs vin= and command= from _execute_command
+        return await func(client)
+
+    entity._api.async_call = AsyncMock(side_effect=execute_call)
+    await entity.async_lock()
+    client.lock.assert_called_once_with("TESTVIN123")
+
+
+@pytest.mark.asyncio
+async def test_async_unlock_executes_api_call() -> None:
+    """Cover lock.py line 118: the inner _call closure calls client.unlock."""
+    entity = _make_lock()
+    client = AsyncMock()
+    client.unlock = AsyncMock(return_value=None)
+
+    async def execute_call(func, **kwargs):  # **kwargs absorbs vin= and command= from _execute_command
+        return await func(client)
+
+    entity._api.async_call = AsyncMock(side_effect=execute_call)
+    await entity.async_unlock()
+    client.unlock.assert_called_once_with("TESTVIN123")
+
+
+# ---------------------------------------------------------------------------
+# async_setup_entry (lines 23-35)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_lock_async_setup_entry_no_vehicles_creates_no_entities() -> None:
+    """Cover lock.py lines 23-35: async_setup_entry with vehicle=None."""
+    from custom_components.byd_vehicle.const import DOMAIN
+    from custom_components.byd_vehicle.lock import async_setup_entry
+
+    vin = "TESTVIN123"
+    coordinator = MagicMock()
+    coordinator.data = {"vehicles": {}}  # vehicle is None → continue
+
+    hass = MagicMock()
+    hass.data = {
+        DOMAIN: {
+            "entry1": {
+                "coordinators": {vin: coordinator},
+                "api": MagicMock(),
+            }
+        }
+    }
+    entry = MagicMock()
+    entry.entry_id = "entry1"
+
+    async_add_entities = MagicMock()
+    await async_setup_entry(hass, entry, async_add_entities)
+
+    async_add_entities.assert_called_once_with([])
+
+
+@pytest.mark.asyncio
+async def test_lock_async_setup_entry_creates_lock_entity() -> None:
+    """Cover lock.py line 33: entity created when vehicle found."""
+    from custom_components.byd_vehicle.const import DOMAIN
+    from custom_components.byd_vehicle.lock import async_setup_entry
+
+    vin = "TESTVIN123"
+    vehicle_mock = MagicMock()
+    coordinator = MagicMock()
+    coordinator.data = {"vehicles": {vin: vehicle_mock}}
+
+    hass = MagicMock()
+    hass.data = {
+        DOMAIN: {
+            "entry1": {
+                "coordinators": {vin: coordinator},
+                "api": MagicMock(),
+            }
+        }
+    }
+    entry = MagicMock()
+    entry.entry_id = "entry1"
+
+    async_add_entities = MagicMock()
+
+    with patch(
+        "custom_components.byd_vehicle.lock.BydLock.__init__",
+        return_value=None,
+    ):
+        await async_setup_entry(hass, entry, async_add_entities)
+
+    async_add_entities.assert_called_once()
+    entities = async_add_entities.call_args[0][0]
+    assert len(entities) == 1
+    assert isinstance(entities[0], BydLock)
